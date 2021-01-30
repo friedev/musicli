@@ -12,6 +12,18 @@ using namespace smf;
 int chToPitch(int ch) {
 	// 12 notes per octave
 	switch (tolower(ch)) {
+		case 'z': return 48; // C3
+		case 's': return 49 ; // C#3
+		case 'x': return 50; // D3
+		case 'd': return 51; // D#3
+		case 'c': return 52; // E3
+		case 'v': return 53; // F3
+		case 'g': return 54; // F#3
+		case 'b': return 55; // G3
+		case 'h': return 56; // G#3
+		case 'n': return 57; // A3
+		case 'j': return 58; // A#3
+		case 'm': return 59; // B3
 		case 'q': return 60; // C4
 		case '2': return 61; // C#4
 		case 'w': return 62; // D4
@@ -29,13 +41,25 @@ int chToPitch(int ch) {
 		case 'o': return 74; // D5
 		case '0': return 75; // D#5
 		case 'p': return 76; // E5
-		default: return 48; // C3
+		default: return 0; // C0
 	}
 }
 
 char* chToNote(int ch) {
 	// 12 notes per octave
 	switch (tolower(ch)) {
+		case 'z': return "C3 ";
+		case 's': return "C#3";
+		case 'x': return "D3 ";
+		case 'd': return "D#3";
+		case 'c': return "E3 ";
+		case 'v': return "F3 ";
+		case 'g': return "F#3";
+		case 'b': return "G3 ";
+		case 'h': return "G#3";
+		case 'n': return "A3 ";
+		case 'j': return "A#3";
+		case 'm': return "B3 ";
 		case 'q': return "C4 ";
 		case '2': return "C#4";
 		case 'w': return "D4 ";
@@ -54,7 +78,7 @@ char* chToNote(int ch) {
 		case '0': return "D#5";
 		case 'p': return "E5 ";
 		case ' ': return "---";
-		default: return "C3";
+		default: return "C0 ";
 	}
 }
 
@@ -102,21 +126,22 @@ int main(int argc, char** argv) {
 	int ch;
 	do {
 		// TODO allow inserting notes, possibly with Shift+(Note)
+		// TODO modal editing
 		ch = getch();
 		switch (ch) {
-			case 'h':
+			case 'H':
 			case KEY_LEFT:
 				currentChannel = max(0, currentChannel - 1);
 				break;
-			case 'l':
+			case 'L':
 			case KEY_RIGHT:
 				currentChannel = min(channels - 1, currentChannel + 1);
 				break;
-			case 'k':
+			case 'K':
 			case KEY_UP:
 				currentNote = max(0, currentNote - 1);
 				break;
-			case 'j':
+			case 'J':
 			case KEY_DOWN:
 				currentNote = min((int) notes[currentChannel].size() - 1, currentNote + 1);
 				break;
