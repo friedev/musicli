@@ -4,6 +4,7 @@
 #include <ncurses.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <vector>
 
 using namespace std;
 using namespace smf;
@@ -69,16 +70,19 @@ int main(int argc, char** argv) {
 	keypad(stdscr, TRUE);
 	noecho();
 
-	int noteCount = 4;
-	int ch[noteCount];
-	printw("Type %d notes\n", noteCount);
-	for (int i = 0; i < noteCount; i++) {
-		ch[i] = getch();
-		printw("%s\n", chToNote(ch[i]));
-	}
+	//int ch[noteCount];
+	vector<int> ch;
+	printw("Type notes and press Enter when done\n");
+	int chInput;
+	do {
+		chInput = getch();
+		if (chInput != '\n') {
+			ch.push_back(chInput);
+			printw("%s\n", chToNote(chInput));
+		}
+	} while (chInput != '\n');
 
-	refresh();
-	getch();
+	//refresh();
 	endwin();
 
 	/*
@@ -98,8 +102,7 @@ int main(int argc, char** argv) {
 	midifile.addTimbre(track, 0, channel, instr);
 
 	int tpq = midifile.getTPQ();
-	int count = 4;
-	for (int i = 0; i < count; i++) {
+	for (int i = 0; i < ch.size(); i++) {
 		int starttick = int((i * 4) / 4.0 * tpq);
 		int key = chToPitch(ch[i]);
 		int endtick = starttick + int((4) / 4.0 * tpq);
