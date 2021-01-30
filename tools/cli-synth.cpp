@@ -11,9 +11,9 @@ using namespace smf;
 
 int chToPitch(int ch) {
 	// 12 notes per octave
-	switch (tolower(ch)) {
+	switch (ch) {
 		case 'z': return 48; // C3
-		case 's': return 49 ; // C#3
+		case 's': return 49; // C#3
 		case 'x': return 50; // D3
 		case 'd': return 51; // D#3
 		case 'c': return 52; // E3
@@ -47,7 +47,7 @@ int chToPitch(int ch) {
 
 char* chToNote(int ch) {
 	// 12 notes per octave
-	switch (tolower(ch)) {
+	switch (ch) {
 		case 'z': return "C3 ";
 		case 's': return "C#3";
 		case 'x': return "D3 ";
@@ -101,16 +101,6 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 }
 
 void exportMIDI(vector<int> notes[], int channels, Options& options, string filename) {
-	/*
-	// Keeping original random code for reference on variable ranges
-	random_device rd;
-	mt19937 mt(rd());
-	uniform_int_distribution<int> starttime(0, 100);
-	uniform_int_distribution<int> duration(1, 8);
-	uniform_int_distribution<int> pitch(36, 84);
-	uniform_int_distribution<int> velocity(40, 100);
-	*/
-
 	MidiFile midifile;
 	int track = 0;
 	int channel = 0;
@@ -139,7 +129,6 @@ void exportMIDI(vector<int> notes[], int channels, Options& options, string file
 		}
 	}
 
-	// Need to sort tracks since added events are appended to track in random tick order.
 	midifile.sortTracks();
 	midifile.write(filename);
 }
@@ -219,13 +208,15 @@ int main(int argc, char** argv) {
 				getch();
 				break;
 			default:
-				if (currentNote == notes[currentChannel].size() - 1) {
-					for (int c = 0; c < channels; c++) {
-						notes[c].push_back(' ');
+				if (chToPitch(ch) != 0) {
+					if (currentNote == notes[currentChannel].size() - 1) {
+						for (int c = 0; c < channels; c++) {
+							notes[c].push_back(' ');
+						}
 					}
+					notes[currentChannel][currentNote] = ch;
+					currentNote++;
 				}
-				notes[currentChannel][currentNote] = ch;
-				currentNote++;
 				break;
 		}
 		printNotes(notes, currentNote, channels, currentChannel);
