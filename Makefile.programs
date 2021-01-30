@@ -83,6 +83,9 @@ PREFLAGS  = -O3 -Wall -I$(INCDIR) $(DEFINES)
 # Using C++ 2011 standard:
 PREFLAGS += -std=c++11
 
+# Link ncurses dependency
+PREFLAGS += -lncurses
+
 # MinGW compiling setup (used to compile for Microsoft Windows but actual
 # compiling can be done in Linux). You have to install MinGW and these
 # variables will probably have to be changed to the correct paths:
