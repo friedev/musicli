@@ -100,16 +100,15 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 	refresh();
 }
 
-void exportMIDI(vector<int> notes[], int channels, Options& options, string filename) {
+void exportMIDI(vector<int> notes[], int channels, Options& options, string filename, int (&instruments)[]) {
 	MidiFile midifile;
 	int track = 0;
-	int channel = 0;
-	int instr = options.getInteger("instrument");
-	midifile.addTimbre(track, 0, channel, instr);
 
 	int tpq = midifile.getTPQ();
 	int prevKey = 0;
 	for (int channel = 0; channel < channels; channel++) {
+		int instrument = instruments[channel];
+		midifile.addTimbre(track, 0, channel, instrument);
 		for (int i = 0; i < notes[channel].size(); i++) {
 			int starttick = int(i / 4.0 * tpq);
 
@@ -141,6 +140,9 @@ int main(int argc, char** argv) {
 	options.process(argc, argv);
 	string filename = options.getString("output-file");
 
+	// TODO read from arguments
+	int instruments[] = {0, 0, 0, 0, 25, 25, 25, 25};
+
 	initscr();
 	cbreak();
 	keypad(stdscr, TRUE);
@@ -159,7 +161,6 @@ int main(int argc, char** argv) {
 	int ch;
 	do {
 		// TODO allow inserting notes, possibly with Shift+(Note)
-		// TODO modal editing
 		ch = getch();
 		switch (ch) {
 			case 'H':
@@ -180,13 +181,17 @@ int main(int argc, char** argv) {
 				break;
 			case KEY_DC:
 				if (currentNote < notes[currentChannel].size() - 2) {
-					notes[currentChannel].erase(notes[currentChannel].begin() + currentNote);
+					for (int c = 0; c < channels; c++) {
+						notes[c].erase(notes[c].begin() + currentNote);
+					}
 					break;
 				}
 				// If on the last note, handle like a backspace
 			case KEY_BACKSPACE:
 				if (notes[currentChannel].size() > 1) {
-					notes[currentChannel].erase(notes[currentChannel].end() - 2);
+					for (int c = 0; c < channels; c++) {
+						notes[c].erase(notes[c].end() - 2);
+					}
 					currentNote = min(currentNote, (int) notes[currentChannel].size() - 1);
 				} else if (notes[currentChannel].size() == 2) {
 					for (int c = 0; c < currentChannel; c++) {
@@ -199,7 +204,7 @@ int main(int argc, char** argv) {
 				break;
 			case 'E':
 				if (!filename.empty()) {
-					exportMIDI(notes, channels, options, filename);
+					exportMIDI(notes, channels, options, filename, instruments);
 					printw("Exported song to file.\n");
 				} else {
 					printw("No file name provided; cannot export.\n");
@@ -208,16 +213,17 @@ int main(int argc, char** argv) {
 				getch();
 				break;
 			default:
-				if (chToPitch(ch) != 0) {
-					if (currentNote == notes[currentChannel].size() - 1) {
-						for (int c = 0; c < channels; c++) {
-							notes[c].push_back(' ');
-						}
-					}
-					notes[currentChannel][currentNote] = ch;
-					currentNote++;
+				if (chToPitch(ch) == 0) {
+					break;
 				}
-				break;
+			case ' ':
+				if (currentNote == notes[currentChannel].size() - 1) {
+					for (int c = 0; c < channels; c++) {
+						notes[c].push_back(' ');
+					}
+				}
+				notes[currentChannel][currentNote] = ch;
+				currentNote++;
 		}
 		printNotes(notes, currentNote, channels, currentChannel);
 	} while (ch != 'Q');
