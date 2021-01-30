@@ -9,14 +9,50 @@ using namespace std;
 using namespace smf;
 
 int chToPitch(int ch) {
+	// 12 notes per octave
 	switch (tolower(ch)) {
 		case 'q': return 60; // C4
 		case '2': return 61; // C#4
 		case 'w': return 62; // D4
 		case '3': return 63; // D#4
 		case 'e': return 64; // E4
-		// TODO add more notes
-		default: return 60; // C4
+		case 'r': return 65; // F4
+		case '5': return 66; // F#4
+		case 't': return 67; // G4
+		case '6': return 68; // G#4
+		case 'y': return 69; // A4
+		case '7': return 70; // A#4
+		case 'u': return 71; // B4
+		case 'i': return 72; // C5
+		case '9': return 73; // C#5
+		case 'o': return 74; // D5
+		case '0': return 75; // D#5
+		case 'p': return 76; // E5
+		default: return 48; // C3
+	}
+}
+
+char* chToNote(int ch) {
+	// 12 notes per octave
+	switch (tolower(ch)) {
+		case 'q': return "C4";
+		case '2': return "C#4";
+		case 'w': return "D4";
+		case '3': return "D#4";
+		case 'e': return "E4";
+		case 'r': return "F4";
+		case '5': return "F#4";
+		case 't': return "G4";
+		case '6': return "G#4";
+		case 'y': return "A4";
+		case '7': return "A#4";
+		case 'u': return "B4";
+		case 'i': return "C5";
+		case '9': return "C#5";
+		case 'o': return "D5";
+		case '0': return "D#5";
+		case 'p': return "E5";
+		default: return "C3";
 	}
 }
 
@@ -38,6 +74,7 @@ int main(int argc, char** argv) {
 	printw("Type %d notes\n", noteCount);
 	for (int i = 0; i < noteCount; i++) {
 		ch[i] = getch();
+		printw("%s\n", chToNote(ch[i]));
 	}
 
 	refresh();
