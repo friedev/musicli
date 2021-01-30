@@ -84,7 +84,6 @@ char* chToNote(int ch) {
 
 void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
 	clear();
-	printw("Type notes and press Enter when done\n");
 	for (int i = 0; i < notes[0].size(); i++) {
 		for (int channel = 0; channel < channels; channel++) {
 			if (i == currentNote && channel == currentChannel) {
@@ -101,83 +100,7 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 	refresh();
 }
 
-int main(int argc, char** argv) {
-	Options options;
-	options.define("o|output-file=s", "Output filename (stdout if none)");
-	options.define("i|instrument=i:0", "General MIDI instrument number");
-	options.define("x|hex=b", "Hex byte-code output");
-	options.process(argc, argv);
-
-	initscr();
-	cbreak();
-	keypad(stdscr, TRUE);
-	noecho();
-
-	int channels = 4;
-	vector<int> notes[channels];
-	for (int channel = 0; channel < channels; channel++) {
-		notes[channel].push_back(' ');
-	}
-
-	int currentChannel = 0;
-	int currentNote = 0;
-	printNotes(notes, currentNote, channels, currentChannel);
-
-	int ch;
-	do {
-		// TODO allow inserting notes, possibly with Shift+(Note)
-		// TODO modal editing
-		ch = getch();
-		switch (ch) {
-			case 'H':
-			case KEY_LEFT:
-				currentChannel = max(0, currentChannel - 1);
-				break;
-			case 'L':
-			case KEY_RIGHT:
-				currentChannel = min(channels - 1, currentChannel + 1);
-				break;
-			case 'K':
-			case KEY_UP:
-				currentNote = max(0, currentNote - 1);
-				break;
-			case 'J':
-			case KEY_DOWN:
-				currentNote = min((int) notes[currentChannel].size() - 1, currentNote + 1);
-				break;
-			case KEY_DC:
-				if (currentNote < notes[currentChannel].size() - 1) {
-					notes[currentChannel].erase(notes[currentChannel].begin() + currentNote);
-					break;
-				}
-				// If on the last note, handle like a backspace
-			case KEY_BACKSPACE:
-				if (notes[currentChannel].size() > 1) {
-					notes[currentChannel].pop_back();
-					currentNote = min(currentNote, (int) notes[currentChannel].size());
-				} else if (notes[currentChannel].size() == 1) {
-					for (int c = 0; c < currentChannel; c++) {
-						notes[c][currentNote] = ' ';
-					}
-				}
-				break;
-			case '\n':
-				break;
-			default:
-				if (currentNote == notes[currentChannel].size() - 1) {
-					for (int c = 0; c < channels; c++) {
-						notes[c].push_back(' ');
-					}
-				}
-				notes[currentChannel][currentNote] = ch;
-				currentNote++;
-				break;
-		}
-		printNotes(notes, currentNote, channels, currentChannel);
-	} while (ch != '\n');
-
-	endwin();
-
+void exportMIDI(vector<int> notes[], int channels, Options& options) {
 	/*
 	// Keeping original random code for reference on variable ranges
 	random_device rd;
@@ -211,7 +134,7 @@ int main(int argc, char** argv) {
 			if (prevKey != 0) {
 				midifile.addNoteOff(track, starttick, channel, prevKey);
 			}
-			midifile.addNoteOn (track, starttick, channel, key, 100);
+			midifile.addNoteOn(track, starttick, channel, key, 100);
 			prevKey = key;
 		}
 	}
@@ -228,6 +151,88 @@ int main(int argc, char** argv) {
 	} else {
 		midifile.write(filename);
 	}
+}
 
+int main(int argc, char** argv) {
+	Options options;
+	options.define("o|output-file=s", "Output filename (stdout if none)");
+	options.define("i|instrument=i:0", "General MIDI instrument number");
+	options.define("x|hex=b", "Hex byte-code output");
+	options.define("c|channels=i:8", "Number of MIDI channels");
+	options.process(argc, argv);
+
+	initscr();
+	cbreak();
+	keypad(stdscr, TRUE);
+	noecho();
+
+	int channels = options.getInteger("channels");
+	vector<int> notes[channels];
+	for (int channel = 0; channel < channels; channel++) {
+		notes[channel].push_back(' ');
+	}
+
+	int currentChannel = 0;
+	int currentNote = 0;
+	printNotes(notes, currentNote, channels, currentChannel);
+
+	int ch;
+	do {
+		// TODO allow inserting notes, possibly with Shift+(Note)
+		// TODO modal editing
+		ch = getch();
+		switch (ch) {
+			case 'H':
+			case KEY_LEFT:
+				currentChannel = max(0, currentChannel - 1);
+				break;
+			case 'L':
+			case KEY_RIGHT:
+				currentChannel = min(channels - 1, currentChannel + 1);
+				break;
+			case 'K':
+			case KEY_UP:
+				currentNote = max(0, currentNote - 1);
+				break;
+			case 'J':
+			case KEY_DOWN:
+				currentNote = min((int) notes[currentChannel].size() - 1, currentNote + 1);
+				break;
+			case KEY_DC:
+				if (currentNote < notes[currentChannel].size() - 2) {
+					notes[currentChannel].erase(notes[currentChannel].begin() + currentNote);
+					break;
+				}
+				// If on the last note, handle like a backspace
+			case KEY_BACKSPACE:
+				if (notes[currentChannel].size() > 1) {
+					notes[currentChannel].erase(notes[currentChannel].end() - 2);
+					currentNote = min(currentNote, (int) notes[currentChannel].size() - 1);
+				} else if (notes[currentChannel].size() == 2) {
+					for (int c = 0; c < currentChannel; c++) {
+						notes[c][0] = ' ';
+					}
+				}
+				break;
+			case 'Q':
+				// Do nothing
+				break;
+			case 'E':
+				exportMIDI(notes, channels, options);
+				break;
+			default:
+				if (currentNote == notes[currentChannel].size() - 1) {
+					for (int c = 0; c < channels; c++) {
+						notes[c].push_back(' ');
+					}
+				}
+				notes[currentChannel][currentNote] = ch;
+				currentNote++;
+				break;
+		}
+		printNotes(notes, currentNote, channels, currentChannel);
+	} while (ch != 'Q');
+
+	endwin();
 	return 0;
 }
