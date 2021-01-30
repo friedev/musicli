@@ -100,7 +100,7 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 	refresh();
 }
 
-void exportMIDI(vector<int> notes[], int channels, Options& options) {
+void exportMIDI(vector<int> notes[], int channels, Options& options, string filename) {
 	/*
 	// Keeping original random code for reference on variable ranges
 	random_device rd;
@@ -141,25 +141,16 @@ void exportMIDI(vector<int> notes[], int channels, Options& options) {
 
 	// Need to sort tracks since added events are appended to track in random tick order.
 	midifile.sortTracks();
-	string filename = options.getString("output-file");
-	if (filename.empty()) {
-		if (options.getBoolean("hex")) {
-			midifile.writeHex(cout);
-		} else {
-			cout << midifile;
-		}
-	} else {
-		midifile.write(filename);
-	}
+	midifile.write(filename);
 }
 
 int main(int argc, char** argv) {
 	Options options;
 	options.define("o|output-file=s", "Output filename (stdout if none)");
 	options.define("i|instrument=i:0", "General MIDI instrument number");
-	options.define("x|hex=b", "Hex byte-code output");
 	options.define("c|channels=i:8", "Number of MIDI channels");
 	options.process(argc, argv);
+	string filename = options.getString("output-file");
 
 	initscr();
 	cbreak();
@@ -218,7 +209,14 @@ int main(int argc, char** argv) {
 				// Do nothing
 				break;
 			case 'E':
-				exportMIDI(notes, channels, options);
+				if (!filename.empty()) {
+					exportMIDI(notes, channels, options, filename);
+					printw("Exported song to file.\n");
+				} else {
+					printw("No file name provided; cannot export.\n");
+				}
+				printw("Press any key to continue.");
+				getch();
 				break;
 			default:
 				if (currentNote == notes[currentChannel].size() - 1) {
