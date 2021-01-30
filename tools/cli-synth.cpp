@@ -53,6 +53,7 @@ char* chToNote(int ch) {
 		case 'o': return "D5";
 		case '0': return "D#5";
 		case 'p': return "E5";
+		case ' ': return "--";
 		default: return "C3";
 	}
 }
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
 
 	// Curses demo from https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/init.html
 	initscr();
-	raw();
+	cbreak();
 	keypad(stdscr, TRUE);
 	noecho();
 
@@ -130,9 +131,15 @@ int main(int argc, char** argv) {
 
 	int tpq = midifile.getTPQ();
 	for (int i = 0; i < notes.size(); i++) {
-		int starttick = int((i * 4) / 4.0 * tpq);
+		if (notes[i] == ' ') {
+			continue;
+		}
 		int key = chToPitch(notes[i]);
-		int endtick = starttick + int((4) / 4.0 * tpq);
+
+		// TODO change note duration based on next note start time
+		int starttick = int(i / 4.0 * tpq);
+		int endtick = starttick + int(2 / 4.0 * tpq);
+
 		midifile.addNoteOn (track, starttick, channel, key, 100);
 		midifile.addNoteOff(track, endtick, channel, key);
 	}
