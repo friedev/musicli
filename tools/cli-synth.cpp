@@ -91,8 +91,14 @@ int main(int argc, char** argv) {
 
 	int channels = 4;
 	vector<int> notes[channels];
-	int channel = 0;
+	for (int channel = 0; channel < channels; channel++) {
+		notes[channel].push_back(' ');
+	}
+
+	int currentChannel = 0;
 	int currentNote = 0;
+	printNotes(notes, currentNote, channels, currentChannel);
+
 	int ch;
 	do {
 		// TODO allow inserting notes, possibly with Shift+(Note)
@@ -100,11 +106,11 @@ int main(int argc, char** argv) {
 		switch (ch) {
 			case 'h':
 			case KEY_LEFT:
-				channel = max(0, channel - 1);
+				currentChannel = max(0, currentChannel - 1);
 				break;
 			case 'l':
 			case KEY_RIGHT:
-				channel = min(channels - 1, channel + 1);
+				currentChannel = min(channels - 1, currentChannel + 1);
 				break;
 			case 'k':
 			case KEY_UP:
@@ -112,33 +118,37 @@ int main(int argc, char** argv) {
 				break;
 			case 'j':
 			case KEY_DOWN:
-				currentNote = min((int) notes[channel].size(), currentNote + 1);
+				currentNote = min((int) notes[currentChannel].size() - 1, currentNote + 1);
 				break;
 			case KEY_DC:
-				if (currentNote < notes[channel].size()) {
-					notes[channel].erase(notes[channel].begin() + currentNote);
+				if (currentNote < notes[currentChannel].size() - 1) {
+					notes[currentChannel].erase(notes[currentChannel].begin() + currentNote);
 					break;
 				}
 				// If on the last note, handle like a backspace
 			case KEY_BACKSPACE:
-				if (notes[channel].size() > 0) {
-					notes[channel].pop_back();
-					currentNote = min(currentNote, (int) notes[channel].size());
+				if (notes[currentChannel].size() > 1) {
+					notes[currentChannel].pop_back();
+					currentNote = min(currentNote, (int) notes[currentChannel].size());
+				} else if (notes[currentChannel].size() == 1) {
+					for (int c = 0; c < currentChannel; c++) {
+						notes[c][currentNote] = ' ';
+					}
 				}
 				break;
 			case '\n':
 				break;
 			default:
-				if (currentNote == notes[channel].size()) {
+				if (currentNote == notes[currentChannel].size() - 1) {
 					for (int c = 0; c < channels; c++) {
 						notes[c].push_back(' ');
 					}
 				}
-				notes[channel][currentNote] = ch;
+				notes[currentChannel][currentNote] = ch;
 				currentNote++;
 				break;
 		}
-		printNotes(notes, currentNote, channels, channel);
+		printNotes(notes, currentNote, channels, currentChannel);
 	} while (ch != '\n');
 
 	endwin();
@@ -155,7 +165,7 @@ int main(int argc, char** argv) {
 
 	MidiFile midifile;
 	int track = 0;
-	channel = 0;
+	int channel = 0;
 	int instr = options.getInteger("instrument");
 	midifile.addTimbre(track, 0, channel, instr);
 
@@ -167,7 +177,7 @@ int main(int argc, char** argv) {
 
 			if (notes[channel][i] == ' ') {
 				if (i == notes[channel].size() - 1 && prevKey != 0) {
-					midifile.addNoteOff(track, starttick, channel, prevKey);
+					midifile.addNoteOff(track, starttick + int(1.0 / 4.0 * tpq), channel, prevKey);
 				}
 				continue;
 			}
@@ -177,9 +187,6 @@ int main(int argc, char** argv) {
 				midifile.addNoteOff(track, starttick, channel, prevKey);
 			}
 			midifile.addNoteOn (track, starttick, channel, key, 100);
-			if (i == notes[channel].size() - 1) {
-				midifile.addNoteOff(track, starttick + int(4.0 * tpq), channel, key);
-			}
 			prevKey = key;
 		}
 	}
