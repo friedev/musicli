@@ -97,6 +97,18 @@ int main(int argc, char** argv) {
 			case KEY_DOWN:
 				currentNote = min((int) notes.size(), currentNote + 1);
 				break;
+			case KEY_DC:
+				if (currentNote < notes.size()) {
+					notes.erase(notes.begin() + currentNote);
+					break;
+				}
+				// If on the last note, handle like a backspace
+			case KEY_BACKSPACE:
+				if (notes.size() > 0) {
+					notes.pop_back();
+					currentNote = min(currentNote, (int) notes.size());
+				}
+				break;
 			case '\n':
 				break;
 			default:
