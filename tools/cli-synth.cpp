@@ -57,6 +57,19 @@ char* chToNote(int ch) {
 	}
 }
 
+void printNotes(vector<int> notes, int currentNote) {
+	clear();
+	printw("Type notes and press Enter when done\n");
+	for (int i = 0; i < notes.size(); i++) {
+		if (i == currentNote) {
+			attron(A_BOLD);
+		}
+		printw("%s\n", chToNote(notes[i]));
+		attroff(A_BOLD);
+	}
+	refresh();
+}
+
 int main(int argc, char** argv) {
 	Options options;
 	options.define("o|output-file=s", "Output filename (stdout if none)");
@@ -71,18 +84,32 @@ int main(int argc, char** argv) {
 	noecho();
 
 	//int ch[noteCount];
-	vector<int> ch;
-	printw("Type notes and press Enter when done\n");
-	int chInput;
+	vector<int> notes;
+	int ch;
+	int currentNote = 0;
 	do {
-		chInput = getch();
-		if (chInput != '\n') {
-			ch.push_back(chInput);
-			printw("%s\n", chToNote(chInput));
+		ch= getch();
+		switch (ch) {
+			case KEY_UP:
+				currentNote = max(0, currentNote - 1);
+				break;
+			case KEY_DOWN:
+				currentNote = min((int) notes.size(), currentNote + 1);
+				break;
+			case '\n':
+				break;
+			default:
+				if (currentNote == notes.size()) {
+					notes.push_back(ch);
+				} else {
+					notes[currentNote] = ch;
+				}
+				currentNote++;
+				break;
 		}
-	} while (chInput != '\n');
+		printNotes(notes, currentNote);
+	} while (ch != '\n');
 
-	//refresh();
 	endwin();
 
 	/*
@@ -102,9 +129,9 @@ int main(int argc, char** argv) {
 	midifile.addTimbre(track, 0, channel, instr);
 
 	int tpq = midifile.getTPQ();
-	for (int i = 0; i < ch.size(); i++) {
+	for (int i = 0; i < notes.size(); i++) {
 		int starttick = int((i * 4) / 4.0 * tpq);
-		int key = chToPitch(ch[i]);
+		int key = chToPitch(notes[i]);
 		int endtick = starttick + int((4) / 4.0 * tpq);
 		midifile.addNoteOn (track, starttick, channel, key, 100);
 		midifile.addNoteOff(track, endtick, channel, key);
