@@ -130,18 +130,23 @@ int main(int argc, char** argv) {
 	midifile.addTimbre(track, 0, channel, instr);
 
 	int tpq = midifile.getTPQ();
+	int prevKey = 0;
 	for (int i = 0; i < notes.size(); i++) {
 		if (notes[i] == ' ') {
 			continue;
 		}
 		int key = chToPitch(notes[i]);
 
-		// TODO change note duration based on next note start time
 		int starttick = int(i / 4.0 * tpq);
-		int endtick = starttick + int(2 / 4.0 * tpq);
-
+		if (prevKey != 0) {
+			midifile.addNoteOff(track, starttick, channel, prevKey);
+		}
 		midifile.addNoteOn (track, starttick, channel, key, 100);
-		midifile.addNoteOff(track, endtick, channel, key);
+		if (i == notes.size() - 1) {
+			midifile.addNoteOff(track, starttick + int(4.0 * tpq), channel, key);
+		}
+		prevKey = key;
+		// FIXME there may be some weirdness if the last note is a rest
 	}
 
 	// Need to sort tracks since added events are appended to track in random tick order.
