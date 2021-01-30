@@ -36,37 +36,43 @@ int chToPitch(int ch) {
 char* chToNote(int ch) {
 	// 12 notes per octave
 	switch (tolower(ch)) {
-		case 'q': return "C4";
+		case 'q': return "C4 ";
 		case '2': return "C#4";
-		case 'w': return "D4";
+		case 'w': return "D4 ";
 		case '3': return "D#4";
-		case 'e': return "E4";
-		case 'r': return "F4";
+		case 'e': return "E4 ";
+		case 'r': return "F4 ";
 		case '5': return "F#4";
-		case 't': return "G4";
+		case 't': return "G4 ";
 		case '6': return "G#4";
-		case 'y': return "A4";
+		case 'y': return "A4 ";
 		case '7': return "A#4";
-		case 'u': return "B4";
-		case 'i': return "C5";
+		case 'u': return "B4 ";
+		case 'i': return "C5 ";
 		case '9': return "C#5";
-		case 'o': return "D5";
+		case 'o': return "D5 ";
 		case '0': return "D#5";
-		case 'p': return "E5";
-		case ' ': return "--";
+		case 'p': return "E5 ";
+		case ' ': return "---";
 		default: return "C3";
 	}
 }
 
-void printNotes(vector<int> notes, int currentNote) {
+void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
 	clear();
 	printw("Type notes and press Enter when done\n");
-	for (int i = 0; i < notes.size(); i++) {
-		if (i == currentNote) {
-			attron(A_BOLD);
+	for (int i = 0; i < notes[0].size(); i++) {
+		for (int channel = 0; channel < channels; channel++) {
+			if (i == currentNote && channel == currentChannel) {
+				attron(A_BOLD);
+			}
+			printw("%s", chToNote(notes[channel][i]));
+			attroff(A_BOLD);
+			if (channel < channels - 1) {
+				printw(" | ");
+			}
 		}
-		printw("%s\n", chToNote(notes[i]));
-		attroff(A_BOLD);
+		printw("\n");
 	}
 	refresh();
 }
@@ -78,49 +84,61 @@ int main(int argc, char** argv) {
 	options.define("x|hex=b", "Hex byte-code output");
 	options.process(argc, argv);
 
-	// Curses demo from https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/init.html
 	initscr();
 	cbreak();
 	keypad(stdscr, TRUE);
 	noecho();
 
-	//int ch[noteCount];
-	vector<int> notes;
-	int ch;
+	int channels = 4;
+	vector<int> notes[channels];
+	int channel = 0;
 	int currentNote = 0;
+	int ch;
 	do {
-		ch= getch();
+		// TODO allow inserting notes, possibly with Shift+(Note)
+		ch = getch();
 		switch (ch) {
+			case 'h':
+			case KEY_LEFT:
+				channel = max(0, channel - 1);
+				break;
+			case 'l':
+			case KEY_RIGHT:
+				channel = min(channels - 1, channel + 1);
+				break;
+			case 'k':
 			case KEY_UP:
 				currentNote = max(0, currentNote - 1);
 				break;
+			case 'j':
 			case KEY_DOWN:
-				currentNote = min((int) notes.size(), currentNote + 1);
+				currentNote = min((int) notes[channel].size(), currentNote + 1);
 				break;
 			case KEY_DC:
-				if (currentNote < notes.size()) {
-					notes.erase(notes.begin() + currentNote);
+				if (currentNote < notes[channel].size()) {
+					notes[channel].erase(notes[channel].begin() + currentNote);
 					break;
 				}
 				// If on the last note, handle like a backspace
 			case KEY_BACKSPACE:
-				if (notes.size() > 0) {
-					notes.pop_back();
-					currentNote = min(currentNote, (int) notes.size());
+				if (notes[channel].size() > 0) {
+					notes[channel].pop_back();
+					currentNote = min(currentNote, (int) notes[channel].size());
 				}
 				break;
 			case '\n':
 				break;
 			default:
-				if (currentNote == notes.size()) {
-					notes.push_back(ch);
-				} else {
-					notes[currentNote] = ch;
+				if (currentNote == notes[channel].size()) {
+					for (int c = 0; c < channels; c++) {
+						notes[c].push_back(' ');
+					}
 				}
+				notes[channel][currentNote] = ch;
 				currentNote++;
 				break;
 		}
-		printNotes(notes, currentNote);
+		printNotes(notes, currentNote, channels, channel);
 	} while (ch != '\n');
 
 	endwin();
@@ -137,28 +155,33 @@ int main(int argc, char** argv) {
 
 	MidiFile midifile;
 	int track = 0;
-	int channel = 0;
+	channel = 0;
 	int instr = options.getInteger("instrument");
 	midifile.addTimbre(track, 0, channel, instr);
 
 	int tpq = midifile.getTPQ();
 	int prevKey = 0;
-	for (int i = 0; i < notes.size(); i++) {
-		if (notes[i] == ' ') {
-			continue;
-		}
-		int key = chToPitch(notes[i]);
+	for (int channel = 0; channel < channels; channel++) {
+		for (int i = 0; i < notes[channel].size(); i++) {
+			int starttick = int(i / 4.0 * tpq);
 
-		int starttick = int(i / 4.0 * tpq);
-		if (prevKey != 0) {
-			midifile.addNoteOff(track, starttick, channel, prevKey);
+			if (notes[channel][i] == ' ') {
+				if (i == notes[channel].size() - 1 && prevKey != 0) {
+					midifile.addNoteOff(track, starttick, channel, prevKey);
+				}
+				continue;
+			}
+			int key = chToPitch(notes[channel][i]);
+
+			if (prevKey != 0) {
+				midifile.addNoteOff(track, starttick, channel, prevKey);
+			}
+			midifile.addNoteOn (track, starttick, channel, key, 100);
+			if (i == notes[channel].size() - 1) {
+				midifile.addNoteOff(track, starttick + int(4.0 * tpq), channel, key);
+			}
+			prevKey = key;
 		}
-		midifile.addNoteOn (track, starttick, channel, key, 100);
-		if (i == notes.size() - 1) {
-			midifile.addNoteOff(track, starttick + int(4.0 * tpq), channel, key);
-		}
-		prevKey = key;
-		// FIXME there may be some weirdness if the last note is a rest
 	}
 
 	// Need to sort tracks since added events are appended to track in random tick order.
