@@ -141,30 +141,69 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 
 void exportMIDI(vector<int> notes[], int channels, Options& options, string filename, int (&instruments)[]) {
 	MidiFile midifile;
-	int track = 0;
-
 	int tpq = midifile.getTPQ();
+
+	// INSTRUMENTS
+
+	int track = midifile.addTrack();
 	int prevKey = 0;
-	for (int channel = 0; channel < channels; channel++) {
+	for (int channel = 0; channel < 9; channel++) {
 		int instrument = instruments[channel];
 		midifile.addTimbre(track, 0, channel, instrument);
 		for (int i = 0; i < notes[channel].size(); i++) {
-			int starttick = int(i / 4.0 * tpq);
+			int startTick = int(i / 4.0 * tpq);
 
 			if (notes[channel][i] == ' ') {
 				if (i == notes[channel].size() - 1 && prevKey != 0) {
-					midifile.addNoteOff(track, starttick + int(1.0 / 4.0 * tpq), channel, prevKey);
+					midifile.addNoteOff(track, startTick + int(1.0 / 4.0 * tpq), channel, prevKey);
 				}
 				continue;
 			}
 			int key = chToPitch(notes[channel][i]);
 
 			if (prevKey != 0) {
-				midifile.addNoteOff(track, starttick, channel, prevKey);
+				midifile.addNoteOff(track, startTick, channel, prevKey);
 			}
-			midifile.addNoteOn(track, starttick, channel, key, 100);
+			midifile.addNoteOn(track, startTick, channel, key, 100);
 			prevKey = key;
 		}
+	}
+
+	// DRUMS
+
+	vector<uchar> midievent; // temporary storage for MIDI events
+	midievent.resize(3);     // set the size of the array to 3 bytes
+	midievent[2] = 100;      // set the loudness to a constant value
+	bool noteOn = false;
+	int prevNote;
+	int i = 0;
+	int actionTime;
+	track = midifile.addTrack();
+	vector<int> drumNotes = notes[9];
+
+	for (int i = 0; i < drumNotes.size(); i++) {
+		if (noteOn) {
+			// turn off previous note
+			midievent[0] = 0x89;
+			midievent[1] = prevNote;
+			actionTime = int(i / 4.0 * tpq - 1);
+			midifile.addEvent(track, actionTime, midievent);
+		}
+		// turn on current note
+		midievent[0] = 0x99;
+		midievent[1] = chToPitch(drumNotes[i]); 
+		actionTime = int(i / 4.0 * tpq);
+		midifile.addEvent(track, actionTime, midievent);
+		noteOn = true;
+		prevNote = chToPitch(drumNotes[i]);
+	}
+
+	if (noteOn) {
+		// turn off last note
+		midievent[0] = 0x89;
+		midievent[1] = prevNote;
+		actionTime = int(i / 4 * tpq);
+		midifile.addEvent(track, actionTime, midievent);
 	}
 
 	midifile.sortTracks();
@@ -190,9 +229,9 @@ void playNote(int instrument, int key, string filename, string soundfont) {
 
 int main(int argc, char** argv) {
 	Options options;
-	options.define("o|output=s", "Output filename (stdout if none)");
+	options.define("o|output=s", "Output filename");
 	options.define("i|instrument=i:0", "General MIDI instrument number");
-	options.define("c|channels=i:8", "Number of MIDI channels");
+	options.define("c|channels=i:10", "Number of MIDI channels");
 	options.define("s|soundfont=s", "Soundfont to use");
 	options.process(argc, argv);
 	string filename = options.getString("output");
@@ -229,7 +268,6 @@ int main(int argc, char** argv) {
 
 	int ch;
 	do {
-		// TODO allow inserting notes, possibly with Shift+(Note)
 		ch = getch();
 		switch (ch) {
 			case 'H':

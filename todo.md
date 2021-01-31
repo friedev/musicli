@@ -9,3 +9,4 @@ Ability to change velocity, duration, etc. in-editor
 Custom instruments
 Easier drums
 Extended ranges (button go up/down by octaves)
+Allow inserting notes, possibly with Shift+(Note)
