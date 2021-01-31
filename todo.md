@@ -1,8 +1,7 @@
 TODO
 
 Play notes as they're typed (non-blocking and non-overlapping)
-Song stats
-Highlighting instruments
+Song stats/line numbers
 Highlight measures
 Choose soundfont from command line
 Step through notes as they're played
@@ -11,4 +10,3 @@ Ability to change velocity, duration, etc. in-editor
 Custom instruments
 Easier drums
 Extended ranges (button go up/down by octaves)
-Line numbers

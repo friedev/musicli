@@ -84,7 +84,6 @@ char* chToNote(int ch) {
 
 void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
 	clear();
-	
 	int start = max(0, currentNote - getmaxy(stdscr) / 2);
 	for (int i = start; i < start + getmaxy(stdscr); i++) {
 		bool colorRow = has_colors() && i % 4 == 0;
@@ -95,20 +94,21 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 		for (int channel = 0; channel < channels; channel++) {
 			bool colorNote = i == currentNote && channel == currentChannel;
 			if (colorNote) {
+				attron(A_BOLD);
 				if (has_colors()) {
 					attron(COLOR_PAIR(2));
 				}
-				attron(A_BOLD);
 			}
 
 			char* output;
 			if (i < notes[channel].size()) {
-				printw("%s", chToNote(notes[channel][i]));
+				printw(" %s ", chToNote(notes[channel][i]));
 			} else {
-				printw("%s", chToNote(' '));
+				printw(" %s ", chToNote(' '));
 			}
 
 			if (colorNote) {
+				attroff(A_BOLD);
 				if (has_colors()) {
 					if (colorRow) {
 						attron(COLOR_PAIR(1));
@@ -116,11 +116,18 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 						attroff(COLOR_PAIR(2));
 					}
 				}
-				attroff(A_BOLD);
+			}
+
+			if (colorRow && channel % 4 == 3 && has_colors()) {
+				attroff(COLOR_PAIR(1));
 			}
 
 			if (channel < channels - 1) {
-				printw(" | ");
+				printw("|");
+			}
+
+			if (colorRow && channel % 4 == 3 && has_colors()) {
+				attron(COLOR_PAIR(1));
 			}
 		}
 		printw("\n");
