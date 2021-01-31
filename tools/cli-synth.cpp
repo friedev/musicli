@@ -83,7 +83,6 @@ char* chToNote(int ch) {
 }
 
 int chToDrumPitch(int ch) {
-	// 12 notes per octave
 	// Drums: https://soundprogramming.net/file-formats/general-midi-drum-note-numbers/
 	switch (ch) {
 		case 'q': return 36; // Bass Drum 1
@@ -101,7 +100,6 @@ int chToDrumPitch(int ch) {
 }
 
 char* chToDrumNote(int ch) {
-	// 12 notes per octave
 	// Drums: https://soundprogramming.net/file-formats/general-midi-drum-note-numbers/
 	switch (ch) {
 		case 'q': return "BASS "; // Bass Drum 1
@@ -273,7 +271,7 @@ void playNote(int instrument, int key, string filename, string soundfont) {
 
 int main(int argc, char** argv) {
 	Options options;
-	options.define("o|output=s", "Output filename");
+	options.define("o|output=s:export.mid", "Output filename");
 	options.define("i|instrument=i:0", "General MIDI instrument number");
 	options.define("c|channels=i:10", "Number of MIDI channels");
 	options.define("s|soundfont=s", "Soundfont to use");
@@ -359,13 +357,8 @@ int main(int argc, char** argv) {
 				// Do nothing
 				break;
 			case 'E':
-				if (!filename.empty()) {
-					exportMIDI(notes, channels, options, filename, instruments);
-					printw("Exported song to file.\n");
-				} else {
-					printw("No file name provided; cannot export.\n");
-				}
-				printw("Press any key to continue.");
+				exportMIDI(notes, channels, options, filename, instruments);
+				printw("Exported song to %s. Press any key to continue.", filename.c_str());
 				getch();
 				break;
 			case 'P':
