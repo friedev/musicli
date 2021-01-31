@@ -85,17 +85,42 @@ char* chToNote(int ch) {
 void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
 	clear();
 	for (int i = 0; i < notes[0].size(); i++) {
+		bool colorRow = has_colors() && i % 4 == 0;
+		if (colorRow) {
+			attron(COLOR_PAIR(1));
+		}
+
 		for (int channel = 0; channel < channels; channel++) {
-			if (i == currentNote && channel == currentChannel) {
+			bool colorNote = i == currentNote && channel == currentChannel;
+			if (colorNote) {
+				if (has_colors()) {
+					attron(COLOR_PAIR(2));
+				}
 				attron(A_BOLD);
 			}
+
 			printw("%s", chToNote(notes[channel][i]));
-			attroff(A_BOLD);
+
+			if (colorNote) {
+				if (has_colors()) {
+					if (colorRow) {
+						attron(COLOR_PAIR(1));
+					} else {
+						attroff(COLOR_PAIR(2));
+					}
+				}
+				attroff(A_BOLD);
+			}
+
 			if (channel < channels - 1) {
 				printw(" | ");
 			}
 		}
 		printw("\n");
+
+		if (colorRow) {
+			attroff(COLOR_PAIR(1));
+		}
 	}
 	refresh();
 }
@@ -147,6 +172,12 @@ int main(int argc, char** argv) {
 	cbreak();
 	keypad(stdscr, TRUE);
 	noecho();
+
+	if (has_colors()) {
+		start_color();
+		init_pair(1, COLOR_BLACK, COLOR_WHITE);
+		init_pair(2, COLOR_YELLOW, COLOR_BLUE);
+	}
 
 	int channels = options.getInteger("channels");
 	vector<int> notes[channels];
