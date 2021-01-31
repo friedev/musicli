@@ -84,7 +84,9 @@ char* chToNote(int ch) {
 
 void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
 	clear();
-	for (int i = 0; i < notes[0].size(); i++) {
+	
+	int start = max(0, currentNote - getmaxy(stdscr) / 2);
+	for (int i = start; i < start + getmaxy(stdscr); i++) {
 		bool colorRow = has_colors() && i % 4 == 0;
 		if (colorRow) {
 			attron(COLOR_PAIR(1));
@@ -99,7 +101,12 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 				attron(A_BOLD);
 			}
 
-			printw("%s", chToNote(notes[channel][i]));
+			char* output;
+			if (i < notes[channel].size()) {
+				printw("%s", chToNote(notes[channel][i]));
+			} else {
+				printw("%s", chToNote(' '));
+			}
 
 			if (colorNote) {
 				if (has_colors()) {
@@ -230,6 +237,11 @@ int main(int argc, char** argv) {
 				break;
 			case 'J':
 			case KEY_DOWN:
+				if (currentNote == notes[currentChannel].size() - 1) {
+					for (int c = 0; c < channels; c++) {
+						notes[c].push_back(' ');
+					}
+				}
 				currentNote = min((int) notes[currentChannel].size() - 1, currentNote + 1);
 				break;
 			case KEY_DC:
