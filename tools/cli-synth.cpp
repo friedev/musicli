@@ -166,7 +166,12 @@ int main(int argc, char** argv) {
 	string filename = options.getString("output-file");
 
 	// TODO read from arguments
-	int instruments[] = {0, 0, 0, 0, 25, 25, 25, 25};
+	// Generic
+	int instruments[] = {0, 0, 0, 0, 25, 25, 25, 25, 34, 34, 34, 34, 57, 57, 57, 57};
+	// Rock
+	int instruments[] = {30, 30, 30, 30, 34, 34, 34, 34, 19, 19, 19, 19, 82, 82, 82, 82};
+	// Electronic
+	int instruments[] = {81, 81, 81, 81, 82, 82, 82, 82, 39, 39, 39, 39, 91, 91, 91, 91};
 
 	initscr();
 	cbreak();
