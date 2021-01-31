@@ -82,6 +82,42 @@ char* chToNote(int ch) {
 	}
 }
 
+int chToDrumPitch(int ch) {
+	// 12 notes per octave
+	// Drums: https://soundprogramming.net/file-formats/general-midi-drum-note-numbers/
+	switch (ch) {
+		case 'q': return 36; // Bass Drum 1
+		case 'w': return 38; // Snare Drum 1
+		case 'e': return 43; // Low Tom 1
+		case 'r': return 47; // Mid Tom 1
+		case 't': return 50; // High Tom 1
+		case 'y': return 42; // Closed Hi-hat
+		case 'u': return 46; // Open Hi-hat
+		case 'i': return 49; // Crash Cymbal 1
+		case 'o': return 51; // Ride Cymbal 1
+		case 'p': return 39; // Hand Clap
+		default: return 0;
+	}
+}
+
+char* chToDrumNote(int ch) {
+	// 12 notes per octave
+	// Drums: https://soundprogramming.net/file-formats/general-midi-drum-note-numbers/
+	switch (ch) {
+		case 'q': return "BASS "; // Bass Drum 1
+		case 'w': return "SNARE"; // Snare Drum 1
+		case 'e': return "L TOM"; // Low Tom 1
+		case 'r': return "M TOM"; // Mid Tom 1
+		case 't': return "H TOM"; // High Tom 1
+		case 'y': return "C HAT"; // Closed Hi-hat
+		case 'u': return "O HAT"; // Open Hi-hat
+		case 'i': return "C CYM"; // Crash Cymbal 1
+		case 'o': return "R CYM"; // Ride Cymbal 1
+		case 'p': return "CLAP "; // Hand Clap
+		default: return "-----";
+	}
+}
+
 void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
 	clear();
 	int start = max(0, currentNote - getmaxy(stdscr) / 2);
@@ -101,10 +137,18 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 			}
 
 			char* output;
-			if (i < notes[channel].size()) {
-				printw(" %s ", chToNote(notes[channel][i]));
+			if (channel == 9) {
+				if (i < notes[channel].size()) {
+					printw(" %s ", chToDrumNote(notes[channel][i]));
+				} else {
+					printw(" %s ", chToDrumNote(' '));
+				}
 			} else {
-				printw(" %s ", chToNote(' '));
+				if (i < notes[channel].size()) {
+					printw(" %s ", chToNote(notes[channel][i]));
+				} else {
+					printw(" %s ", chToNote(' '));
+				}
 			}
 
 			if (colorNote) {
@@ -141,7 +185,7 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 
 void exportMIDI(vector<int> notes[], int channels, Options& options, string filename, int (&instruments)[]) {
 	MidiFile midifile;
-	int tpq = midifile.getTPQ();
+	int tpq = midifile.getTPQ(); // Ticks per quarter note
 
 	// INSTRUMENTS
 
@@ -191,11 +235,11 @@ void exportMIDI(vector<int> notes[], int channels, Options& options, string file
 		}
 		// turn on current note
 		midievent[0] = 0x99;
-		midievent[1] = chToPitch(drumNotes[i]); 
+		midievent[1] = chToDrumPitch(drumNotes[i]);
 		actionTime = int(i / 4.0 * tpq);
 		midifile.addEvent(track, actionTime, midievent);
 		noteOn = true;
-		prevNote = chToPitch(drumNotes[i]);
+		prevNote = chToDrumPitch(drumNotes[i]);
 	}
 
 	if (noteOn) {
@@ -329,7 +373,7 @@ int main(int argc, char** argv) {
 				playFile("tmp.mid", soundfont);
 				break;
 			default:
-				if (chToPitch(ch) == 0) {
+				if ((currentChannel == 9 && chToDrumPitch(ch) == 0) || (currentChannel != 9 && chToPitch(ch) == 0)) {
 					break;
 				}
 			case ' ':
