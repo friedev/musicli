@@ -157,6 +157,23 @@ void exportMIDI(vector<int> notes[], int channels, Options& options, string file
 	midifile.write(filename);
 }
 
+void playFile(string filename) {
+	char command[100];
+	sprintf(command, "fluidsynth -a alsa -m alsa_seq -liq %s 2>/dev/null", filename.c_str());
+	system(command);
+}
+
+void playNote(int instrument, int key, string filename) {
+	MidiFile midifile;
+	int tpq = midifile.getTPQ();
+	midifile.addTimbre(0, 0, 0, instrument);
+	midifile.addNoteOn(0, 0, 0, key, 100);
+	midifile.addNoteOff(0, int(1.0 * tpq), 0, key);
+	midifile.write(filename);
+
+	playFile(filename);
+}
+
 int main(int argc, char** argv) {
 	Options options;
 	options.define("o|output-file=s", "Output filename (stdout if none)");
@@ -169,9 +186,9 @@ int main(int argc, char** argv) {
 	// Generic
 	int instruments[] = {0, 0, 0, 0, 25, 25, 25, 25, 34, 34, 34, 34, 57, 57, 57, 57};
 	// Rock
-	int instruments[] = {30, 30, 30, 30, 34, 34, 34, 34, 19, 19, 19, 19, 82, 82, 82, 82};
+	//int instruments[] = {30, 30, 30, 30, 34, 34, 34, 34, 19, 19, 19, 19, 82, 82, 82, 82};
 	// Electronic
-	int instruments[] = {81, 81, 81, 81, 82, 82, 82, 82, 39, 39, 39, 39, 91, 91, 91, 91};
+	//int instruments[] = {81, 81, 81, 81, 82, 82, 82, 82, 39, 39, 39, 39, 91, 91, 91, 91};
 
 	initscr();
 	cbreak();
@@ -248,6 +265,10 @@ int main(int argc, char** argv) {
 				printw("Press any key to continue.");
 				getch();
 				break;
+			case 'P':
+				exportMIDI(notes, channels, options, "tmp.mid", instruments);
+				playFile("tmp.mid");
+				break;
 			default:
 				if (chToPitch(ch) == 0) {
 					break;
@@ -260,6 +281,7 @@ int main(int argc, char** argv) {
 				}
 				notes[currentChannel][currentNote] = ch;
 				currentNote++;
+				//playNote(0, chToPitch(ch), "soundfont.sf2", "tmp.mid");
 		}
 		printNotes(notes, currentNote, channels, currentChannel);
 	} while (ch != 'Q');
