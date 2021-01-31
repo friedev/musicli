@@ -8,6 +8,5 @@ Ability to change velocity, duration, etc. in-editor
 Custom instruments
 Multiple drum tracks
 Extended ranges (button to go up/down by octaves)
-Allow inserting new blank lines
 Change tempo
 Add documentation

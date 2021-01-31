@@ -353,9 +353,14 @@ int main(int argc, char** argv) {
 					}
 					currentNote = min(currentNote, (int) notes[currentChannel].size() - 1);
 				} else if (notes[currentChannel].size() == 2) {
-					for (int c = 0; c < currentChannel; c++) {
+					for (int c = 0; c < channels; c++) {
 						notes[c][0] = ' ';
 					}
+				}
+				break;
+			case 'I':
+				for (int c = 0; c < channels; c++) {
+					notes[c].insert(notes[c].begin()+currentNote, ' ');
 				}
 				break;
 			case 'Q':
