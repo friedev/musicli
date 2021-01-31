@@ -116,10 +116,14 @@ char* chToDrumNote(int ch) {
 	}
 }
 
-void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel) {
+void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel, bool lineNumbers) {
 	clear();
 	int start = max(0, currentNote - getmaxy(stdscr) / 2);
 	for (int i = start; i < start + getmaxy(stdscr); i++) {
+		if (lineNumbers) {
+			printw("%-3d", i);
+		}
+
 		bool colorRow = has_colors() && i % 4 == 0;
 		if (colorRow) {
 			attron(COLOR_PAIR(1));
@@ -275,6 +279,7 @@ int main(int argc, char** argv) {
 	options.define("i|instrument=i:0", "General MIDI instrument number");
 	options.define("c|channels=i:10", "Number of MIDI channels");
 	options.define("s|soundfont=s", "Soundfont to use");
+	options.define("l|linenumbers=b:true", "Enable/disable line numbers");
 	options.process(argc, argv);
 	string filename = options.getString("output");
 	string soundfont = options.getString("soundfont");
@@ -306,7 +311,7 @@ int main(int argc, char** argv) {
 
 	int currentChannel = 0;
 	int currentNote = 0;
-	printNotes(notes, currentNote, channels, currentChannel);
+	printNotes(notes, currentNote, channels, currentChannel, options.getBoolean("linenumbers"));
 
 	int ch;
 	do {
@@ -379,7 +384,7 @@ int main(int argc, char** argv) {
 				currentNote++;
 				//playNote(0, chToPitch(ch), "soundfont.sf2", "tmp.mid");
 		}
-		printNotes(notes, currentNote, channels, currentChannel);
+		printNotes(notes, currentNote, channels, currentChannel, options.getBoolean("linenumbers"));
 	} while (ch != 'Q');
 
 	endwin();
