@@ -171,13 +171,13 @@ void exportMIDI(vector<int> notes[], int channels, Options& options, string file
 	midifile.write(filename);
 }
 
-void playFile(string filename) {
+void playFile(string filename, string soundfont) {
 	char command[100];
-	sprintf(command, "fluidsynth -a alsa -m alsa_seq -liq %s 2>/dev/null", filename.c_str());
+	sprintf(command, "fluidsynth -a alsa -m alsa_seq -liq %s %s 2>/dev/null", soundfont.c_str(), filename.c_str());
 	system(command);
 }
 
-void playNote(int instrument, int key, string filename) {
+void playNote(int instrument, int key, string filename, string soundfont) {
 	MidiFile midifile;
 	int tpq = midifile.getTPQ();
 	midifile.addTimbre(0, 0, 0, instrument);
@@ -185,16 +185,18 @@ void playNote(int instrument, int key, string filename) {
 	midifile.addNoteOff(0, int(1.0 * tpq), 0, key);
 	midifile.write(filename);
 
-	playFile(filename);
+	playFile(filename, soundfont);
 }
 
 int main(int argc, char** argv) {
 	Options options;
-	options.define("o|output-file=s", "Output filename (stdout if none)");
+	options.define("o|output=s", "Output filename (stdout if none)");
 	options.define("i|instrument=i:0", "General MIDI instrument number");
 	options.define("c|channels=i:8", "Number of MIDI channels");
+	options.define("s|soundfont=s", "Soundfont to use");
 	options.process(argc, argv);
-	string filename = options.getString("output-file");
+	string filename = options.getString("output");
+	string soundfont = options.getString("soundfont");
 
 	// TODO read from arguments
 	// Generic
@@ -286,7 +288,7 @@ int main(int argc, char** argv) {
 				break;
 			case 'P':
 				exportMIDI(notes, channels, options, "tmp.mid", instruments);
-				playFile("tmp.mid");
+				playFile("tmp.mid", soundfont);
 				break;
 			default:
 				if (chToPitch(ch) == 0) {
