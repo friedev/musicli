@@ -116,7 +116,7 @@ char* chToDrumNote(int ch) {
 	}
 }
 
-void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel, bool lineNumbers) {
+void printNotes(vector<int> notes[], int currentNote, int channels, int currentChannel, bool lineNumbers, int measure) {
 	clear();
 	int start = max(0, currentNote - getmaxy(stdscr) / 2);
 	for (int i = start; i < start + getmaxy(stdscr); i++) {
@@ -125,8 +125,15 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 		}
 
 		bool colorRow = has_colors() && i % 4 == 0;
+		int rowColor;
+		if (i % (4 * measure) == 0) {
+			rowColor = 3;
+		} else {
+			rowColor = 1;
+		}
+
 		if (colorRow) {
-			attron(COLOR_PAIR(1));
+			attron(COLOR_PAIR(rowColor));
 		}
 
 		for (int channel = 0; channel < channels; channel++) {
@@ -157,7 +164,7 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 				attroff(A_BOLD);
 				if (has_colors()) {
 					if (colorRow) {
-						attron(COLOR_PAIR(1));
+						attron(COLOR_PAIR(rowColor));
 					} else {
 						attroff(COLOR_PAIR(2));
 					}
@@ -165,7 +172,7 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 			}
 
 			if (colorRow && channel % 4 == 3 && has_colors()) {
-				attroff(COLOR_PAIR(1));
+				attroff(COLOR_PAIR(rowColor));
 			}
 
 			if (channel < channels - 1) {
@@ -173,13 +180,13 @@ void printNotes(vector<int> notes[], int currentNote, int channels, int currentC
 			}
 
 			if (colorRow && channel % 4 == 3 && has_colors()) {
-				attron(COLOR_PAIR(1));
+				attron(COLOR_PAIR(rowColor));
 			}
 		}
 		printw("\n");
 
 		if (colorRow) {
-			attroff(COLOR_PAIR(1));
+			attroff(COLOR_PAIR(rowColor));
 		}
 	}
 	refresh();
@@ -280,6 +287,7 @@ int main(int argc, char** argv) {
 	options.define("c|channels=i:10", "Number of MIDI channels");
 	options.define("s|soundfont=s", "Soundfont to use");
 	options.define("l|linenumbers=b:true", "Enable/disable line numbers");
+	options.define("m|measure=i:4", "Number of beats per measure");
 	options.process(argc, argv);
 	string filename = options.getString("output");
 	string soundfont = options.getString("soundfont");
@@ -301,6 +309,7 @@ int main(int argc, char** argv) {
 		start_color();
 		init_pair(1, COLOR_BLACK, COLOR_WHITE);
 		init_pair(2, COLOR_YELLOW, COLOR_BLUE);
+		init_pair(3, COLOR_BLACK, COLOR_YELLOW);
 	}
 
 	int channels = options.getInteger("channels");
@@ -311,7 +320,7 @@ int main(int argc, char** argv) {
 
 	int currentChannel = 0;
 	int currentNote = 0;
-	printNotes(notes, currentNote, channels, currentChannel, options.getBoolean("linenumbers"));
+	printNotes(notes, currentNote, channels, currentChannel, options.getBoolean("linenumbers"), options.getInteger("measure"));
 
 	int ch;
 	do {
@@ -389,7 +398,7 @@ int main(int argc, char** argv) {
 				currentNote++;
 				//playNote(0, chToPitch(ch), "soundfont.sf2", "tmp.mid");
 		}
-		printNotes(notes, currentNote, channels, currentChannel, options.getBoolean("linenumbers"));
+		printNotes(notes, currentNote, channels, currentChannel, options.getBoolean("linenumbers"), options.getInteger("measure"));
 	} while (ch != 'Q');
 
 	endwin();
