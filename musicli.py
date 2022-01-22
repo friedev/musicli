@@ -24,6 +24,69 @@ import sys
 import time
 
 
+class Note:
+    def __init__(self, number, duration=1, velocity=127):
+        self.number = number
+        self.duration = duration
+        self.velocity = velocity
+
+    @property
+    def semitone(self):
+        return self.number % 12
+
+    @property
+    def name(self):
+        return self.name_in_key('C')
+
+    def name_in_key(self, key):
+        sharp = key in ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
+        semitone = self.semitone
+        if semitone == 0:
+            return 'C'
+        elif semitone == 1:
+            return 'C#' if sharp else 'Db'
+        elif semitone == 2:
+            return 'D'
+        elif semitone == 3:
+            return 'D#' if sharp else 'Eb'
+        elif semitone == 4:
+            return 'E'
+        elif semitone == 5:
+            return 'F'
+        elif semitone == 6:
+            return 'F#' if sharp else 'Gb'
+        elif semitone == 7:
+            return 'G'
+        elif semitone == 8:
+            return 'G#' if sharp else 'Ab'
+        elif semitone == 9:
+            return 'A'
+        elif semitone == 10:
+            return 'A#' if sharp else 'Bb'
+        else:
+            return 'B'
+
+    @property
+    def octave(self):
+        return self.number // 12 - 1
+
+    def __repr__(self):
+        return self.name + str(self.octave)
+
+
+def note_y(window, note):
+    c4 = 60
+    height = window.getmaxyx()[0]
+    midpoint = height // 2
+    return midpoint - (note.number - c4)
+
+
+def draw_notes(window, beats):
+    for x, notes in enumerate(beats):
+        for note in notes:
+            window.addstr(note_y(window, note), x * 2, str(note))
+
+
 def main(stdscr):
     '''
     Main render/input loop.
@@ -34,12 +97,15 @@ def main(stdscr):
     # Allow using default terminal colors (-1 = default color)
     curses.use_default_colors()
 
+    # Stores the notes played on each beat of the song
+    beats = [[Note(60), Note(67), Note(76)]]
+
     needs_input = True
     input_code = None
 
     # Loop until user the exits
     while True:
-        stdscr.addstr(0, 0, 'hello')
+        draw_notes(stdscr, beats)
 
         stdscr.refresh()
 
