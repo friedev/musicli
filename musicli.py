@@ -19,10 +19,9 @@ import argparse
 import curses
 import curses.ascii
 import sys
-import time
 
 import fluidsynth
-import mido
+from mido import Message, MidiFile, MidiTrack
 
 
 # Python curses does not define curses.COLOR_GRAY, even though it appears to be
@@ -30,8 +29,8 @@ import mido
 COLOR_GRAY = 8
 
 # Color pair numbers
-INSTRUMENT_PAIRS = [1, 2, 3, 4, 5, 6]
-PAIR_AXIS = 7
+INSTRUMENT_PAIRS = list(range(1, 8))
+PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
 
 SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
 FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb']
@@ -44,15 +43,47 @@ FLAT_NAMES = [
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
 ]
 
-TICKS_PER_BEAT = 480
+
+def ticks_to_beats(ticks):
+    return ticks // ARGS.ticks_per_beat
+
+
+def beats_to_ticks(beats):
+    return beats * ARGS.ticks_per_beat
+
+
+def beats_to_units(beats):
+    return beats * ARGS.units_per_beat
+
+
+def units_to_beats(units):
+    return units // ARGS.ticks_per_beat
+
+
+def ticks_to_units(ticks):
+    return int(ticks / ARGS.ticks_per_beat * ARGS.units_per_beat)
+
+
+def units_to_ticks(units):
+    return int(units / ARGS.units_per_beat * ARGS.ticks_per_beat)
 
 
 class Note:
-    def __init__(self, number, duration=1, velocity=127, instrument=0):
+    def __init__(self,
+                 number,
+                 start,
+                 duration,
+                 velocity=127,
+                 instrument=0):
         self.number = number
+        self.start = start
         self.duration = duration
         self.velocity = velocity
         self.instrument = instrument
+
+    @property
+    def end(self):
+        return self.start + self.duration
 
     @property
     def semitone(self):
@@ -61,6 +92,22 @@ class Note:
     @property
     def name(self):
         return self.name_in_key('C')
+
+    @property
+    def on_event(self):
+        return NoteEvent(on=True,
+                         number=self.number,
+                         time=self.start,
+                         velocity=self.velocity,
+                         instrument=self.instrument)
+
+    @property
+    def off_event(self):
+        return NoteEvent(on=False,
+                         number=self.number,
+                         time=self.start + self.duration,
+                         velocity=self.velocity,
+                         instrument=self.instrument)
 
     def name_in_key(self, key):
         if key in SHARP_KEYS:
@@ -75,72 +122,142 @@ class Note:
     def __repr__(self):
         return self.name + str(self.octave)
 
+    def __lt__(self, other):
+        return self.start < other.start
 
-def draw_axis(window, x_offset, y_offset):
+    def __gt__(self, other):
+        return self.start > other.start
+
+
+class NoteEvent:
+    def __init__(self,
+                 on,
+                 number,
+                 time,
+                 velocity=127,
+                 instrument=0):
+        self.on = on
+        self.number = number
+        self.time = time
+        self.velocity = velocity
+        self.instrument = instrument
+
+    def __lt__(self, other):
+        return self.time < other.time
+
+    def __gt__(self, other):
+        return self.time > other.time
+
+
+def notes_to_events(notes):
+    events = []
+    for note in notes:
+        events.append(note.on_event)
+        events.append(note.off_event)
+    return sorted(events)
+
+
+def events_to_messages(events):
+    messages = []
+    last_time = 0
+    for event in events:
+        delta = event.time - last_time
+        message_type = 'note_on' if event.on else 'note_off'
+        messages.append(Message(message_type,
+                                note=event.number,
+                                velocity=event.velocity,
+                                time=delta))
+        last_time = event.time
+    return messages
+
+
+def notes_to_messages(notes):
+    return events_to_messages(notes_to_events(notes))
+
+
+def messages_to_notes(messages, instrument=0):
+    notes_on = []
+    notes = []
+    time = 0
+    for message in messages:
+        time += message.time
+        if message.type == 'note_on':
+            notes_on.append(Note(number=message.note,
+                                 start=time,
+                                 duration=0,
+                                 velocity=message.velocity,
+                                 instrument=instrument))
+        elif message.type == 'note_off':
+            for note in notes_on:
+                if note.number == message.note:
+                    note.duration = time - note.start
+                    notes.append(note)
+                    notes_on.remove(note)
+    return notes
+
+
+def import_midi(infile_path):
+    infile = MidiFile(infile_path)
+    ARGS.ticks_per_beat = infile.ticks_per_beat
+
+    notes = []
+    for i, track in enumerate(infile.tracks):
+        notes += messages_to_notes(track, i)
+    return notes
+
+
+def export_midi(notes):
+    outfile = MidiFile(ticks_per_beat=ARGS.ticks_per_beat)
+
+    track = MidiTrack()
+    outfile.tracks.append(track)
+
+    track.append(Message('program_change', program=12))
+    #track.append(Message('set_tempo', ...))
+
+    for message in notes_to_messages(notes):
+        track.append(message)
+
+    outfile.save('test.mid')
+
+
+def draw_axis(window, y_offset):
     height = window.getmaxyx()[0]
     for y, note in enumerate(range(y_offset, y_offset + height)):
         window.addstr(height - y - 1,
-                      x_offset,
-                      str(Note(note)),
+                      0,
+                      str(Note(note, 0, 0)).ljust(4),
                       curses.color_pair(PAIR_AXIS))
 
 
-def draw_notes(window, beats, x_offset, y_offset):
-    height = window.getmaxyx()[0]
-    x = 4
-    for notes in beats:
-        for note in notes:
-            string = str(note.name).ljust(note.duration)
-            if len(string) > note.duration:
-                string = ' ' * note.duration
-            window.addstr(height - (note.number - y_offset) - 1,
-                          x + x_offset,
-                          string,
-                          curses.color_pair(INSTRUMENT_PAIRS[note.instrument]))
-        x += 1
+def draw_notes(window, notes, x_offset, y_offset, min_x_offset):
+    height, width = window.getmaxyx()
+    for note in notes:
+        duration_units = ticks_to_units(note.duration)
+        string = str(note.name).ljust(duration_units)
+        if len(string) > duration_units:
+            string = ' ' * duration_units
 
+        y = height - (note.number - y_offset) - 1
+        x = ticks_to_units(note.start) - x_offset
+        if y < 0 or y >= height:
+            continue
 
-def save(beats):
-    outfile = mido.MidiFile(ticks_per_beat=TICKS_PER_BEAT)
+        if x < min_x_offset:
+            string = string[min_x_offset - x:]
+            x = min_x_offset
+        if x + duration_units >= width:
+            string = string[:width - (x + duration_units) - 1]
+        if string == '':
+            continue
 
-    track = mido.MidiTrack()
-    outfile.tracks.append(track)
+        color_pair = INSTRUMENT_PAIRS[note.instrument % len(INSTRUMENT_PAIRS)]
 
-    track.append(mido.Message('program_change', program=12))
-    #track.append(mido.Message('set_tempo', ...))
-
-    note_off_messages = {}
-
-    beat = 0
-    delta = 0
-    while beat < len(beats) or note_off_messages:
-        if beat < len(beats):
-            for note in beats[beat]:
-                track.append(mido.Message('note_on',
-                                          note=note.number,
-                                          velocity=note.velocity,
-                                          time=delta))
-
-                note_off_beat = beat + note.duration
-                if note_off_beat in note_off_messages:
-                    note_off_messages[note_off_beat].append(note)
-                else:
-                    note_off_messages[note_off_beat] = [note]
-                delta = 0
-
-        if beat in note_off_messages:
-            for note in note_off_messages[beat]:
-                track.append(mido.Message('note_off',
-                                          note=note.number,
-                                          velocity=note.velocity,
-                                          time=delta))
-                delta = 0
-            del note_off_messages[beat]
-
-        beat += 1
-        delta += TICKS_PER_BEAT // 4
-
-    outfile.save('test.mid')
+        #raise Exception(string, x, y)
+        window.addstr(y,
+                      x,
+                      string,
+                      curses.color_pair(color_pair))
 
 
 def main(stdscr):
@@ -156,26 +273,28 @@ def main(stdscr):
     # Initialize color pairs
     for pair in INSTRUMENT_PAIRS:
         curses.init_pair(pair, curses.COLOR_BLACK, pair)
-    curses.init_pair(PAIR_AXIS, COLOR_GRAY, -1)
+    curses.init_pair(PAIR_AXIS, COLOR_GRAY, curses.COLOR_BLACK)
 
-    # Stores the notes played on each beat of the song
-    beats = [
-        [Note(60, duration=2)],
-        [],
-        [Note(62, duration=2)],
-        [],
-        [Note(64, duration=2)],
-        [],
-        [Note(62, duration=2)],
-        [],
-        [Note(60, duration=1)],
-        [Note(62, duration=1)],
-        [Note(64, duration=1)],
-        [Note(65, duration=1)],
-        [Note(67, duration=8), Note(64, duration=8), Note(60, duration=8)],
-    ]
+    notes = import_midi(ARGS.infile.name) if ARGS.infile else []
 
-    x_offset = 0
+    #notes = [
+        #Note(60, start=units_to_ticks(0),  duration=units_to_ticks(2)),
+        #Note(62, start=units_to_ticks(2),  duration=units_to_ticks(2)),
+        #Note(64, start=units_to_ticks(4),  duration=units_to_ticks(2)),
+        #Note(62, start=units_to_ticks(6),  duration=units_to_ticks(2)),
+        #Note(60, start=units_to_ticks(8),  duration=units_to_ticks(1)),
+        #Note(62, start=units_to_ticks(9),  duration=units_to_ticks(1)),
+        #Note(64, start=units_to_ticks(10), duration=units_to_ticks(1)),
+        #Note(65, start=units_to_ticks(11), duration=units_to_ticks(1)),
+        #Note(60, start=units_to_ticks(12), duration=units_to_ticks(8)),
+        #Note(64, start=units_to_ticks(12), duration=units_to_ticks(8)),
+        #Note(67, start=units_to_ticks(12), duration=units_to_ticks(8)),
+    #]
+
+    min_x_offset = 4
+    min_y_offset = 0
+    max_y_offset = 127 - stdscr.getmaxyx()[0]
+    x_offset = 4
     y_offset = 60 - stdscr.getmaxyx()[0] // 2
 
     needs_input = True
@@ -183,8 +302,8 @@ def main(stdscr):
 
     # Loop until user the exits
     while True:
-        draw_axis(stdscr, x_offset, y_offset)
-        draw_notes(stdscr, beats, x_offset, y_offset)
+        draw_axis(stdscr, y_offset)
+        draw_notes(stdscr, notes, x_offset, y_offset, min_x_offset)
 
         stdscr.refresh()
 
@@ -203,9 +322,19 @@ def main(stdscr):
         else:
             input_char = ''
 
-        # Save to MIDI
-        if input_char == 's':
-            save(beats)
+        # Pan view
+        if input_char == 'h':
+            x_offset = max(x_offset - 1, min_x_offset)
+        elif input_char == 'l':
+            x_offset = x_offset + 1
+        elif input_char == 'j':
+            y_offset = max(y_offset - 1, min_y_offset)
+        elif input_char == 'k':
+            y_offset = min(y_offset + 1, max_y_offset)
+
+        # Export to MIDI
+        elif input_char == 'w':
+            export_midi(notes)
 
         # Quit
         elif input_char == 'q' or\
@@ -219,9 +348,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
             description='A MIDI sequencer for the terminal')
     parser.add_argument(
-            'soundfont',
+            '-s', '--soundfont',
             type=argparse.FileType('r'),
-            help='the SF2 soundfont file to use (required for playback)')
+            help='SF2 soundfont file to use for playback')
+    parser.add_argument(
+            '-i', '--infile',
+            type=argparse.FileType('r'),
+            help='MIDI file to read as input')
+    parser.add_argument(
+            '--ticks-per-beat',
+            type=int,
+            default=480,
+            help='MIDI ticks per beat (quarter note)')
+    parser.add_argument(
+            '--units-per-beat',
+            type=int,
+            default=4,
+            help='the number of subdivisions per beat to display in MusiCLI')
     # ARGS is global
     ARGS = parser.parse_args()
 
