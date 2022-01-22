@@ -24,6 +24,25 @@ import sys
 import time
 
 
+# Python curses does not define curses.COLOR_GRAY, even though it appears to be
+# number 8 by default
+COLOR_GRAY = 8
+
+# Color pair numbers
+PAIR_AXIS = 1
+
+SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
+FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb']
+
+SHARP_NAMES = [
+    'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
+]
+
+FLAT_NAMES = [
+    'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
+]
+
+
 class Note:
     def __init__(self, number, duration=1, velocity=127):
         self.number = number
@@ -39,32 +58,10 @@ class Note:
         return self.name_in_key('C')
 
     def name_in_key(self, key):
-        sharp = key in ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
-        semitone = self.semitone
-        if semitone == 0:
-            return 'C'
-        elif semitone == 1:
-            return 'C#' if sharp else 'Db'
-        elif semitone == 2:
-            return 'D'
-        elif semitone == 3:
-            return 'D#' if sharp else 'Eb'
-        elif semitone == 4:
-            return 'E'
-        elif semitone == 5:
-            return 'F'
-        elif semitone == 6:
-            return 'F#' if sharp else 'Gb'
-        elif semitone == 7:
-            return 'G'
-        elif semitone == 8:
-            return 'G#' if sharp else 'Ab'
-        elif semitone == 9:
-            return 'A'
-        elif semitone == 10:
-            return 'A#' if sharp else 'Bb'
+        if key in SHARP_KEYS:
+            return SHARP_NAMES[self.semitone]
         else:
-            return 'B'
+            return FLAT_NAMES[self.semitone]
 
     @property
     def octave(self):
@@ -74,17 +71,19 @@ class Note:
         return self.name + str(self.octave)
 
 
-def note_y(window, note):
-    c4 = 60
+def draw_axis(window, x_offset, y_offset):
     height = window.getmaxyx()[0]
-    midpoint = height // 2
-    return midpoint - (note.number - c4)
+    for y, note in enumerate(range(y_offset, y_offset + height)):
+        window.addstr(height - y - 1, 0, str(Note(note)), curses.color_pair(PAIR_AXIS))
 
 
-def draw_notes(window, beats):
-    for x, notes in enumerate(beats):
+def draw_notes(window, beats, x_offset, y_offset):
+    height = window.getmaxyx()[0]
+    x = 4
+    for notes in beats:
         for note in notes:
-            window.addstr(note_y(window, note), x * 2, str(note))
+            window.addstr(height - (note.number - y_offset) - 1, x + x_offset, str(note))
+        x += 2
 
 
 def main(stdscr):
@@ -97,15 +96,22 @@ def main(stdscr):
     # Allow using default terminal colors (-1 = default color)
     curses.use_default_colors()
 
+    # Initialize color pairs
+    curses.init_pair(PAIR_AXIS, COLOR_GRAY, -1)
+
     # Stores the notes played on each beat of the song
     beats = [[Note(60), Note(67), Note(76)]]
+
+    x_offset = 0
+    y_offset = 60 - stdscr.getmaxyx()[0] // 2
 
     needs_input = True
     input_code = None
 
     # Loop until user the exits
     while True:
-        draw_notes(stdscr, beats)
+        draw_axis(stdscr, x_offset, y_offset)
+        draw_notes(stdscr, beats, x_offset, y_offset)
 
         stdscr.refresh()
 
