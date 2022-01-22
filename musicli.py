@@ -19,9 +19,10 @@ import argparse
 import curses
 import curses.ascii
 import sys
+from time import sleep
 
-import fluidsynth
-from mido import Message, MidiFile, MidiTrack
+from fluidsynth import Synth
+from mido import bpm2tempo, Message, MidiFile, MidiTrack
 
 
 # Python curses does not define curses.COLOR_GRAY, even though it appears to be
@@ -43,6 +44,16 @@ FLAT_NAMES = [
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
 ]
 
+
+def is_chr(char):
+    '''
+    Can the given character be cast to a chr?
+    '''
+    try:
+        chr(char)
+        return True
+    except ValueError:
+        return False
 
 def ticks_to_beats(ticks):
     return ticks // ARGS.ticks_per_beat
@@ -112,8 +123,7 @@ class Note:
     def name_in_key(self, key):
         if key in SHARP_KEYS:
             return SHARP_NAMES[self.semitone]
-        else:
-            return FLAT_NAMES[self.semitone]
+        return FLAT_NAMES[self.semitone]
 
     @property
     def octave(self):
@@ -213,12 +223,29 @@ def export_midi(notes):
     outfile.tracks.append(track)
 
     track.append(Message('program_change', program=12))
-    #track.append(Message('set_tempo', ...))
+    track.append(Message('set_tempo', tempo=bpm2tempo(ARGS.beats_per_minute)))
 
     for message in notes_to_messages(notes):
         track.append(message)
 
     outfile.save('test.mid')
+
+
+def init_synth():
+    synth = Synth()
+    synth.start()
+    soundfont = synth.sfload(ARGS.soundfont.name)
+    synth.program_select(0, soundfont, 0, 0)
+    return synth
+
+
+def start_playback(messages, synth):
+    for message in messages:
+        sleep(message.time / ARGS.ticks_per_beat / ARGS.beats_per_minute * 60.0)
+        if message.type == 'note_on':
+            synth.noteon(0, message.note, message.velocity)
+        elif message.type == 'note_off':
+            synth.noteoff(0, message.note)
 
 
 def draw_axis(window, y_offset):
@@ -253,11 +280,16 @@ def draw_notes(window, notes, x_offset, y_offset, min_x_offset):
 
         color_pair = INSTRUMENT_PAIRS[note.instrument % len(INSTRUMENT_PAIRS)]
 
-        #raise Exception(string, x, y)
         window.addstr(y,
                       x,
                       string,
                       curses.color_pair(color_pair))
+
+
+def exit_curses(synth):
+    if synth is not None:
+        synth.delete()
+    sys.exit(0)
 
 
 def main(stdscr):
@@ -277,19 +309,20 @@ def main(stdscr):
 
     notes = import_midi(ARGS.infile.name) if ARGS.infile else []
 
-    #notes = [
-        #Note(60, start=units_to_ticks(0),  duration=units_to_ticks(2)),
-        #Note(62, start=units_to_ticks(2),  duration=units_to_ticks(2)),
-        #Note(64, start=units_to_ticks(4),  duration=units_to_ticks(2)),
-        #Note(62, start=units_to_ticks(6),  duration=units_to_ticks(2)),
-        #Note(60, start=units_to_ticks(8),  duration=units_to_ticks(1)),
-        #Note(62, start=units_to_ticks(9),  duration=units_to_ticks(1)),
-        #Note(64, start=units_to_ticks(10), duration=units_to_ticks(1)),
-        #Note(65, start=units_to_ticks(11), duration=units_to_ticks(1)),
-        #Note(60, start=units_to_ticks(12), duration=units_to_ticks(8)),
-        #Note(64, start=units_to_ticks(12), duration=units_to_ticks(8)),
-        #Note(67, start=units_to_ticks(12), duration=units_to_ticks(8)),
-    #]
+
+#   notes = [
+#       Note(60, start=units_to_ticks(0),  duration=units_to_ticks(2)),
+#       Note(62, start=units_to_ticks(2),  duration=units_to_ticks(2)),
+#       Note(64, start=units_to_ticks(4),  duration=units_to_ticks(2)),
+#       Note(62, start=units_to_ticks(6),  duration=units_to_ticks(2)),
+#       Note(60, start=units_to_ticks(8),  duration=units_to_ticks(1)),
+#       Note(62, start=units_to_ticks(9),  duration=units_to_ticks(1)),
+#       Note(64, start=units_to_ticks(10), duration=units_to_ticks(1)),
+#       Note(65, start=units_to_ticks(11), duration=units_to_ticks(1)),
+#       Note(60, start=units_to_ticks(12), duration=units_to_ticks(8)),
+#       Note(64, start=units_to_ticks(12), duration=units_to_ticks(8)),
+#       Note(67, start=units_to_ticks(12), duration=units_to_ticks(8)),
+#   ]
 
     min_x_offset = 4
     min_y_offset = 0
@@ -313,11 +346,11 @@ def main(stdscr):
             while needs_input and input_code == curses.ERR:
                 input_code = stdscr.getch()
         except KeyboardInterrupt:
-            sys.exit(0)
+            exit_curses(SYNTH)
 
         stdscr.erase()
 
-        if curses.ascii.isalnum(input_code):
+        if is_chr(input_code):
             input_char = chr(input_code)
         else:
             input_char = ''
@@ -336,11 +369,14 @@ def main(stdscr):
         elif input_char == 'w':
             export_midi(notes)
 
+        elif input_char == ' ':
+            start_playback(notes_to_messages(notes), SYNTH)
+
         # Quit
         elif input_char == 'q' or\
                 input_code == curses.ascii.ESC or\
                 input_code == curses.ascii.EOT:
-            sys.exit(0)
+            exit_curses(SYNTH)
 
 
 if __name__ == '__main__':
@@ -365,7 +401,14 @@ if __name__ == '__main__':
             type=int,
             default=4,
             help='the number of subdivisions per beat to display in MusiCLI')
-    # ARGS is global
+    parser.add_argument(
+            '--beats-per-minute',
+            type=int,
+            default=120,
+            help='the tempo of the song in beats per minute (BPM)')
+
+    # Globals
     ARGS = parser.parse_args()
+    SYNTH = init_synth() if ARGS.soundfont else None
 
     curses.wrapper(main)
