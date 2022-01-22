@@ -18,10 +18,11 @@
 import argparse
 import curses
 import curses.ascii
-import fluidsynth
-import mido
 import sys
 import time
+
+import fluidsynth
+import mido
 
 
 # Python curses does not define curses.COLOR_GRAY, even though it appears to be
@@ -29,7 +30,8 @@ import time
 COLOR_GRAY = 8
 
 # Color pair numbers
-PAIR_AXIS = 1
+INSTRUMENT_PAIRS = [1, 2, 3, 4, 5, 6]
+PAIR_AXIS = 7
 
 SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
 FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb']
@@ -44,10 +46,11 @@ FLAT_NAMES = [
 
 
 class Note:
-    def __init__(self, number, duration=1, velocity=127):
+    def __init__(self, number, duration=1, velocity=127, instrument=0):
         self.number = number
         self.duration = duration
         self.velocity = velocity
+        self.instrument = instrument
 
     @property
     def semitone(self):
@@ -74,7 +77,10 @@ class Note:
 def draw_axis(window, x_offset, y_offset):
     height = window.getmaxyx()[0]
     for y, note in enumerate(range(y_offset, y_offset + height)):
-        window.addstr(height - y - 1, 0, str(Note(note)), curses.color_pair(PAIR_AXIS))
+        window.addstr(height - y - 1,
+                      x_offset,
+                      str(Note(note)),
+                      curses.color_pair(PAIR_AXIS))
 
 
 def draw_notes(window, beats, x_offset, y_offset):
@@ -82,7 +88,13 @@ def draw_notes(window, beats, x_offset, y_offset):
     x = 4
     for notes in beats:
         for note in notes:
-            window.addstr(height - (note.number - y_offset) - 1, x + x_offset, str(note))
+            string = str(note.name).ljust(note.duration)
+            if len(string) > note.duration:
+                string = ' ' * note.duration
+            window.addstr(height - (note.number - y_offset) - 1,
+                          x + x_offset,
+                          string,
+                          curses.color_pair(INSTRUMENT_PAIRS[note.instrument]))
         x += 2
 
 
@@ -97,10 +109,12 @@ def main(stdscr):
     curses.use_default_colors()
 
     # Initialize color pairs
+    for pair in INSTRUMENT_PAIRS:
+        curses.init_pair(pair, curses.COLOR_BLACK, pair)
     curses.init_pair(PAIR_AXIS, COLOR_GRAY, -1)
 
     # Stores the notes played on each beat of the song
-    beats = [[Note(60), Note(67), Note(76)]]
+    beats = [[Note(60, duration=4), Note(67, duration=2), Note(76, duration=1)]]
 
     x_offset = 0
     y_offset = 60 - stdscr.getmaxyx()[0] // 2
@@ -124,8 +138,6 @@ def main(stdscr):
             sys.exit(0)
 
         stdscr.erase()
-
-        # Handle input
 
         if curses.ascii.isalnum(input_code):
             input_char = chr(input_code)
