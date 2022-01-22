@@ -44,6 +44,8 @@ FLAT_NAMES = [
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
 ]
 
+TICKS_PER_BEAT = 480
+
 
 class Note:
     def __init__(self, number, duration=1, velocity=127, instrument=0):
@@ -95,7 +97,50 @@ def draw_notes(window, beats, x_offset, y_offset):
                           x + x_offset,
                           string,
                           curses.color_pair(INSTRUMENT_PAIRS[note.instrument]))
-        x += 2
+        x += 1
+
+
+def save(beats):
+    outfile = mido.MidiFile(ticks_per_beat=TICKS_PER_BEAT)
+
+    track = mido.MidiTrack()
+    outfile.tracks.append(track)
+
+    track.append(mido.Message('program_change', program=12))
+    #track.append(mido.Message('set_tempo', ...))
+
+    note_off_messages = {}
+
+    beat = 0
+    delta = 0
+    while beat < len(beats) or note_off_messages:
+        if beat < len(beats):
+            for note in beats[beat]:
+                track.append(mido.Message('note_on',
+                                          note=note.number,
+                                          velocity=note.velocity,
+                                          time=delta))
+
+                note_off_beat = beat + note.duration
+                if note_off_beat in note_off_messages:
+                    note_off_messages[note_off_beat].append(note)
+                else:
+                    note_off_messages[note_off_beat] = [note]
+                delta = 0
+
+        if beat in note_off_messages:
+            for note in note_off_messages[beat]:
+                track.append(mido.Message('note_off',
+                                          note=note.number,
+                                          velocity=note.velocity,
+                                          time=delta))
+                delta = 0
+            del note_off_messages[beat]
+
+        beat += 1
+        delta += TICKS_PER_BEAT // 4
+
+    outfile.save('test.mid')
 
 
 def main(stdscr):
@@ -114,7 +159,21 @@ def main(stdscr):
     curses.init_pair(PAIR_AXIS, COLOR_GRAY, -1)
 
     # Stores the notes played on each beat of the song
-    beats = [[Note(60, duration=4), Note(67, duration=2), Note(76, duration=1)]]
+    beats = [
+        [Note(60, duration=2)],
+        [],
+        [Note(62, duration=2)],
+        [],
+        [Note(64, duration=2)],
+        [],
+        [Note(62, duration=2)],
+        [],
+        [Note(60, duration=1)],
+        [Note(62, duration=1)],
+        [Note(64, duration=1)],
+        [Note(65, duration=1)],
+        [Note(67, duration=8), Note(64, duration=8), Note(60, duration=8)],
+    ]
 
     x_offset = 0
     y_offset = 60 - stdscr.getmaxyx()[0] // 2
@@ -144,8 +203,12 @@ def main(stdscr):
         else:
             input_char = ''
 
+        # Save to MIDI
+        if input_char == 's':
+            save(beats)
+
         # Quit
-        if input_char == 'q' or\
+        elif input_char == 'q' or\
                 input_code == curses.ascii.ESC or\
                 input_code == curses.ascii.EOT:
             sys.exit(0)
