@@ -1,8 +1,6 @@
 # TODO
 
 - Insert mode
-	- Change insertion time: left/right
-	- Change octave: up/down
 	- Change velocity
 - Status bar
 	- Insert mode status indicator
@@ -14,6 +12,7 @@
 - Custom tempo
 - Custom key and scale (affects guidelines and insert mode keymap)
 - Argument for outfile path
+- Keybind to sync playhead and cursor
 - Generalize start point based on key and octave rather than hardcoded to C4
 - Keybind to toggle snap-to-scale
 - Add flag to disable Unicode

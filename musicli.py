@@ -36,7 +36,10 @@ PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
 PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
 
+TOTAL_NOTES = 127
 NOTES_PER_OCTAVE = 12
+MAX_VELOCITY = 127
+START_OCTAVE = 4
 
 SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
 FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
@@ -121,7 +124,7 @@ class Note:
                  number,
                  start,
                  duration,
-                 velocity=127,
+                 velocity=MAX_VELOCITY,
                  instrument=0):
         self.number = number
         self.start = start
@@ -186,7 +189,7 @@ class NoteEvent:
                  on,
                  number,
                  time,
-                 velocity=127,
+                 velocity=MAX_VELOCITY,
                  instrument=0):
         self.on = on
         self.number = number
@@ -420,14 +423,14 @@ def main(stdscr):
     height, width = stdscr.getmaxyx()
     min_x_offset = -4
     min_y_offset = 0
-    max_y_offset = 127 - height
+    max_y_offset = TOTAL_NOTES - height
     x_offset = -4
-    y_offset = 60 - height // 2
+    y_offset = (START_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
 
     insert = False
-    octave = 4
+    octave = START_OCTAVE
     time = 0
-    duration = 4
+    duration = ARGS.units_per_beat
     last_note = None
     last_chord = []
 
@@ -488,16 +491,30 @@ def main(stdscr):
                 continue
         else:
             # Pan view
-            if input_char == 'h' or input_code == curses.KEY_LEFT:
+            if input_char == 'h':
                 x_offset = max(x_offset - 4, min_x_offset)
-            if input_char == 'l' or input_code == curses.KEY_RIGHT:
+            if input_char == 'l':
                 x_offset += 4
-            if input_char == 'j' or input_code == curses.KEY_DOWN:
+            if input_char == 'j':
                 y_offset = max(y_offset - 2, min_y_offset)
-            if input_char == 'k' or input_code == curses.KEY_UP:
+            if input_char == 'k':
                 y_offset = min(y_offset + 2, max_y_offset)
 
-        if input_char and input_char in '[]{}':  # '' is in every string
+        # Move the write head and octave
+        if input_code == curses.KEY_LEFT:
+            time = max(time - duration, 0)
+        elif input_code == curses.KEY_RIGHT:
+            time += duration
+        elif input_code == curses.KEY_UP:
+            octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
+            y_offset = min(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
+                           max_y_offset)
+        elif input_code == curses.KEY_DOWN:
+            octave = max(octave - 1, 0)
+            y_offset = max(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
+                           min_y_offset)
+
+        elif input_char and input_char in '[]{}':  # '' is in every string
             if last_note is not None:
                 # Change duration of last note
                 if input_char == '[':
