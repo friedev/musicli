@@ -33,8 +33,8 @@ COLOR_GRAY = 8
 
 # Color pair numbers
 INSTRUMENT_PAIRS = list(range(1, 8))
-PAIR_AXIS_NOTE = len(INSTRUMENT_PAIRS) + 1
-PAIR_AXIS_KEY = len(INSTRUMENT_PAIRS) + 2
+PAIR_SIDEBAR_NOTE = len(INSTRUMENT_PAIRS) + 1
+PAIR_SIDEBAR_KEY = len(INSTRUMENT_PAIRS) + 2
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 3
 PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 4
 PAIR_STATUS_NORMAL = len(INSTRUMENT_PAIRS) + 5
@@ -440,7 +440,7 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
                           curses.color_pair(color_pair))
 
 
-def draw_axis(window, octave, y_offset):
+def draw_sidebar(window, octave, y_offset):
     height, _ = window.getmaxyx()
     for y, number in enumerate(range(y_offset, y_offset + height)):
         note = Note(number, 0, 0)
@@ -448,12 +448,12 @@ def draw_axis(window, octave, y_offset):
         window.addstr(height - y - 1,
                       0,
                       str(note).ljust(4).rjust(6),
-                      curses.color_pair(PAIR_AXIS_NOTE))
+                      curses.color_pair(PAIR_SIDEBAR_NOTE))
         if 0 <= insert_key < len(INSERT_KEYLIST):
             window.addstr(height - y - 1,
                           0,
                           INSERT_KEYLIST[insert_key],
-                          curses.color_pair(PAIR_AXIS_KEY))
+                          curses.color_pair(PAIR_SIDEBAR_KEY))
 
 
 def draw_status_bar(window, insert, filename, time, message):
@@ -573,16 +573,16 @@ def main(stdscr):
     for pair in INSTRUMENT_PAIRS:
         curses.init_pair(pair, curses.COLOR_BLACK, pair)
     try:
-        curses.init_pair(PAIR_AXIS_NOTE, COLOR_GRAY, curses.COLOR_BLACK)
+        curses.init_pair(PAIR_SIDEBAR_NOTE, COLOR_GRAY, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
         curses.init_pair(PAIR_LAST_CHORD, curses.COLOR_BLACK, COLOR_GRAY)
     except ValueError:
-        curses.init_pair(PAIR_AXIS_NOTE,
+        curses.init_pair(PAIR_SIDEBAR_NOTE,
                          curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
         curses.init_pair(PAIR_LAST_CHORD,
                          curses.COLOR_BLACK, curses.COLOR_WHITE)
-    curses.init_pair(PAIR_AXIS_KEY, curses.COLOR_WHITE, curses.COLOR_BLACK)
+    curses.init_pair(PAIR_SIDEBAR_KEY, curses.COLOR_WHITE, curses.COLOR_BLACK)
     curses.init_pair(PAIR_PLAYHEAD, -1, curses.COLOR_WHITE)
     curses.init_pair(PAIR_STATUS_NORMAL,
                      curses.COLOR_BLACK, curses.COLOR_BLUE)
@@ -598,6 +598,7 @@ def main(stdscr):
     playback_thread = None
 
     height, width = stdscr.getmaxyx()
+    units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
     min_x_offset = -6
     min_y_offset = 0
     max_y_offset = TOTAL_NOTES - height
@@ -622,18 +623,19 @@ def main(stdscr):
         height, width = stdscr.getmaxyx()
         if play_playback.is_set() and (playhead_position < x_offset or
                                        playhead_position >= x_offset + width):
-            x_offset = max(playhead_position - (playhead_position % 16),
+            x_offset = max(playhead_position -
+                           playhead_position % units_per_measure,
                            min_x_offset)
 
         draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
         draw_measure_lines(stdscr, x_offset)
-        write_head_x = time + (0 if last_note is None else duration) - x_offset
-        draw_line(stdscr, write_head_x, '▏' if ARGS.unicode else '|',
+        cursor_x = time + (0 if last_note is None else duration) - x_offset
+        draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
                   curses.color_pair(0))
         draw_line(stdscr, playhead_position - x_offset, ' ',
                   curses.color_pair(PAIR_PLAYHEAD))
         draw_notes(stdscr, notes, last_note, last_chord, x_offset, y_offset)
-        draw_axis(stdscr, octave, y_offset)
+        draw_sidebar(stdscr, octave, y_offset)
         draw_status_bar(stdscr, insert, filename, time, message)
 
         stdscr.refresh()
@@ -664,7 +666,8 @@ def main(stdscr):
                     time += duration
                     if insert and time > x_offset + width:
                         new_offset = time - width // 2
-                        x_offset = max(new_offset - (new_offset % 16),
+                        x_offset = max(new_offset -
+                                       new_offset % units_per_measure,
                                        min_x_offset)
                     last_chord = []
 
@@ -712,7 +715,8 @@ def main(stdscr):
 
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
-                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
+                x_offset = max(new_offset - new_offset % units_per_measure,
+                               min_x_offset)
         elif input_code == curses.KEY_UP:
             octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
             y_offset = min(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
@@ -776,8 +780,10 @@ def main(stdscr):
 
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
-                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
+                x_offset = max(new_offset - new_offset % units_per_measure,
+                               min_x_offset)
 
+        # Delete last note
         elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
             if last_note is not None:
                 notes.remove(last_note)
@@ -789,10 +795,11 @@ def main(stdscr):
             insert = True
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
-                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
+                x_offset = max(new_offset - new_offset % units_per_measure,
+                               min_x_offset)
 
         # Leave insert mode
-        elif input_code == curses.ascii.ESC:
+        elif input_char == '`' or input_code == curses.ascii.ESC:
             if not insert:
                 message = 'Press Ctrl+C to exit MusiCLI'
             insert = False
