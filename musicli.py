@@ -15,10 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import argparse
+from argparse import ArgumentParser, FileType
 import curses
 import curses.ascii
 import sys
+from threading import Event, Thread
 from time import sleep
 
 from fluidsynth import Synth
@@ -49,6 +50,8 @@ SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
 SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
+stop_playback = Event()
+
 
 def is_chr(char):
     '''
@@ -59,6 +62,7 @@ def is_chr(char):
         return True
     except ValueError:
         return False
+
 
 def ticks_to_beats(ticks):
     return ticks // ARGS.ticks_per_beat
@@ -247,6 +251,8 @@ def init_synth():
 def start_playback(messages, synth):
     for message in messages:
         sleep(message.time / ARGS.ticks_per_beat / ARGS.beats_per_minute * 60.0)
+        if stop_playback.is_set():
+            sys.exit(0)
         if message.type == 'note_on':
             synth.noteon(0, message.note, message.velocity)
         elif message.type == 'note_off':
@@ -301,7 +307,9 @@ def draw_notes(window, notes, x_offset, y_offset):
                           curses.color_pair(color_pair))
 
 
-def exit_curses(synth):
+def exit_curses(synth, synth_thread):
+    stop_playback.set()
+    synth_thread.join()
     if synth is not None:
         synth.delete()
     sys.exit(0)
@@ -329,19 +337,7 @@ def main(stdscr):
 
     notes = import_midi(ARGS.infile.name) if ARGS.infile else []
 
-#   notes = [
-#       Note(60, start=units_to_ticks(0),  duration=units_to_ticks(2)),
-#       Note(62, start=units_to_ticks(2),  duration=units_to_ticks(2)),
-#       Note(64, start=units_to_ticks(4),  duration=units_to_ticks(2)),
-#       Note(62, start=units_to_ticks(6),  duration=units_to_ticks(2)),
-#       Note(60, start=units_to_ticks(8),  duration=units_to_ticks(1)),
-#       Note(62, start=units_to_ticks(9),  duration=units_to_ticks(1)),
-#       Note(64, start=units_to_ticks(10), duration=units_to_ticks(1)),
-#       Note(65, start=units_to_ticks(11), duration=units_to_ticks(1)),
-#       Note(60, start=units_to_ticks(12), duration=units_to_ticks(8)),
-#       Note(64, start=units_to_ticks(12), duration=units_to_ticks(8)),
-#       Note(67, start=units_to_ticks(12), duration=units_to_ticks(8)),
-#   ]
+    synth_thread = None
 
     min_x_offset = 4
     min_y_offset = 0
@@ -366,7 +362,7 @@ def main(stdscr):
             while needs_input and input_code == curses.ERR:
                 input_code = stdscr.getch()
         except KeyboardInterrupt:
-            exit_curses(SYNTH)
+            exit_curses(SYNTH, synth_thread)
 
         stdscr.erase()
 
@@ -389,27 +385,34 @@ def main(stdscr):
         elif input_char == 'w':
             export_midi(notes)
 
+        # Start/stop audio playback
         elif input_char == ' ':
-            start_playback(notes_to_messages(notes), SYNTH)
+            if synth_thread is None or not synth_thread.is_alive():
+                stop_playback.clear()
+                synth_thread = Thread(target=start_playback,
+                                      args=(notes_to_messages(notes), SYNTH))
+                synth_thread.start()
+            else:
+                stop_playback.set()
 
         # Quit
         elif input_char == 'q' or\
                 input_code == curses.ascii.ESC or\
                 input_code == curses.ascii.EOT:
-            exit_curses(SYNTH)
+            exit_curses(SYNTH, synth_thread)
 
 
 if __name__ == '__main__':
     # Parse arguments
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
             description='A MIDI sequencer for the terminal')
     parser.add_argument(
             '-s', '--soundfont',
-            type=argparse.FileType('r'),
+            type=FileType('r'),
             help='SF2 soundfont file to use for playback')
     parser.add_argument(
             '-i', '--infile',
-            type=argparse.FileType('r'),
+            type=FileType('r'),
             help='MIDI file to read as input')
     parser.add_argument(
             '--ticks-per-beat',
