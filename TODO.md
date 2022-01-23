@@ -1,16 +1,17 @@
 # TODO
 
-- Insert mode
-	- Change velocity
 - Status bar
 	- Insert mode status indicator
 	- Note details (name, octave, velocity, instrument)
+- Insert mode
+	- Change velocity
 - Note manipulation in normal mode
 - Play back notes and chords as they're typed (separate synth)
 - Drums
 - MIDI input/output support
 - Custom tempo
 - Custom key and scale (affects guidelines and insert mode keymap)
+- Undo/redo stack
 - Argument for outfile path
 - Keybind to sync playhead and cursor
 - Generalize start point based on key and octave rather than hardcoded to C4

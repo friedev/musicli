@@ -336,14 +336,14 @@ def draw_scale_dots(window, x_offset, y_offset):
 
 
 def draw_measure_lines(window, x_offset):
-    height, width = window.getmaxyx()
+    _, width = window.getmaxyx()
     for x in range(-x_offset % 16, width - 1, 16):
         draw_line(window, x, '▏', curses.color_pair(PAIR_LINE))
 
 
 def draw_line(window, x, string, attr):
     height, width = window.getmaxyx()
-    if 0 <= x + len(string) < width:
+    if 0 <= x and x + len(string) < width:
         for y in range(0, height):
             window.addstr(y, x, string, attr)
 
@@ -363,15 +363,16 @@ def draw_notes(window, notes, x_offset, y_offset):
         color_pair = INSTRUMENT_PAIRS[note.instrument % len(INSTRUMENT_PAIRS)]
 
         for x in range(max(0, start_x), min(width - 1, end_x)):
-            window.addstr(y,
-                          x,
-                          ' ',
-                          curses.color_pair(color_pair))
+            window.addstr(y, x, ' ', curses.color_pair(color_pair))
 
         if 0 <= start_x < width - 1:
-            window.addstr(y,
-                          start_x,
-                          '▏',
+            window.addstr(y, start_x, '▏',
+                          curses.color_pair(color_pair))
+
+        note_width = end_x - start_x
+        if note_width >= 4 and (0 <= start_x + 1 and
+                                start_x + len(note.name) < width - 1):
+            window.addstr(y, start_x + 1, note.name,
                           curses.color_pair(color_pair))
 
 
@@ -441,7 +442,8 @@ def main(stdscr):
         height, width = stdscr.getmaxyx()
         if play_playback.is_set() and (playhead_position < x_offset or
                                        playhead_position >= x_offset + width):
-            x_offset = playhead_position - (playhead_position % 16)
+            x_offset = max(playhead_position - (playhead_position % 16),
+                           min_x_offset)
 
         draw_scale_dots(stdscr, x_offset, y_offset)
         draw_measure_lines(stdscr, x_offset)
