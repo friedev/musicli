@@ -1,6 +1,5 @@
 # TODO
 
-- Show keybinds on axis
 - Automatically select notes/chords under the cursor?
 - Change velocity in insert mode
 - Drums

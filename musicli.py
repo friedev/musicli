@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# PyMusiCLI - A MIDI sequencer for the terminal
+# MusiCLI - A MIDI sequencer for the terminal
 # Copyright (C) 2021 Aaron Friesen
 #
 # This program is free software: you can redistribute it and/or modify
@@ -28,19 +28,19 @@ from fluidsynth import Synth
 from mido import bpm2tempo, Message, MetaMessage, MidiFile, MidiTrack
 
 
-# Python curses does not define curses.COLOR_GRAY, even though it appears to be
-# number 8 by default
+# On some systems, color 8 is gray, but this is not fully standardized
 COLOR_GRAY = 8
 
 # Color pair numbers
 INSTRUMENT_PAIRS = list(range(1, 8))
-PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
-PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
-PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
-PAIR_STATUS_NORMAL = len(INSTRUMENT_PAIRS) + 4
-PAIR_STATUS_INSERT = len(INSTRUMENT_PAIRS) + 5
-PAIR_LAST_NOTE = len(INSTRUMENT_PAIRS) + 6
-PAIR_LAST_CHORD = len(INSTRUMENT_PAIRS) + 7
+PAIR_AXIS_NOTE = len(INSTRUMENT_PAIRS) + 1
+PAIR_AXIS_KEY = len(INSTRUMENT_PAIRS) + 2
+PAIR_LINE = len(INSTRUMENT_PAIRS) + 3
+PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 4
+PAIR_STATUS_NORMAL = len(INSTRUMENT_PAIRS) + 5
+PAIR_STATUS_INSERT = len(INSTRUMENT_PAIRS) + 6
+PAIR_LAST_NOTE = len(INSTRUMENT_PAIRS) + 7
+PAIR_LAST_CHORD = len(INSTRUMENT_PAIRS) + 8
 
 SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
 FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
@@ -54,12 +54,18 @@ FLAT_NAMES = (
 )
 
 SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
-SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
+SCALE_MAJOR_PENTATONIC = [0, 2, 4, 7, 9]
+SCALE_MINOR_NATURAL = [0, 2, 3, 5, 7, 8, 10]
+SCALE_MINOR_HARMONIC = [0, 2, 3, 5, 7, 8, 11]
+SCALE_MINOR_PENTATONIC = [0, 3, 5, 7, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
 SCALE_NAME_MAP = {
     'major': SCALE_MAJOR,
-    'minor': SCALE_MINOR,
+    'major_pentatonic': SCALE_MAJOR_PENTATONIC,
+    'natural_minor': SCALE_MINOR_NATURAL,
+    'harmonic_minor': SCALE_MINOR_HARMONIC,
+    'minor_pentatonic': SCALE_MAJOR_PENTATONIC,
     'blues': SCALE_BLUES,
 }
 
@@ -100,6 +106,8 @@ INSERT_KEYMAP = {
     '0': 27,  # D#
     'p': 28,  # E
 }
+
+INSERT_KEYLIST = tuple('zsxdcvgbhnjmq2w3er5t6y7ui9o0p')
 
 NAME_TO_NUMBER = {
     'C':  0,
@@ -432,13 +440,20 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
                           curses.color_pair(color_pair))
 
 
-def draw_axis(window, y_offset):
+def draw_axis(window, octave, y_offset):
     height, _ = window.getmaxyx()
-    for y, note in enumerate(range(y_offset, y_offset + height)):
+    for y, number in enumerate(range(y_offset, y_offset + height)):
+        note = Note(number, 0, 0)
+        insert_key = number - octave * NOTES_PER_OCTAVE
         window.addstr(height - y - 1,
                       0,
-                      str(Note(note, 0, 0)).ljust(4),
-                      curses.color_pair(PAIR_AXIS))
+                      str(note).ljust(4).rjust(6),
+                      curses.color_pair(PAIR_AXIS_NOTE))
+        if 0 <= insert_key < len(INSERT_KEYLIST):
+            window.addstr(height - y - 1,
+                          0,
+                          INSERT_KEYLIST[insert_key],
+                          curses.color_pair(PAIR_AXIS_KEY))
 
 
 def draw_status_bar(window, insert, filename, time, message):
@@ -558,14 +573,16 @@ def main(stdscr):
     for pair in INSTRUMENT_PAIRS:
         curses.init_pair(pair, curses.COLOR_BLACK, pair)
     try:
-        curses.init_pair(PAIR_AXIS, COLOR_GRAY, curses.COLOR_BLACK)
+        curses.init_pair(PAIR_AXIS_NOTE, COLOR_GRAY, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
         curses.init_pair(PAIR_LAST_CHORD, curses.COLOR_BLACK, COLOR_GRAY)
     except ValueError:
-        curses.init_pair(PAIR_AXIS, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(PAIR_AXIS_NOTE,
+                         curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
         curses.init_pair(PAIR_LAST_CHORD,
                          curses.COLOR_BLACK, curses.COLOR_WHITE)
+    curses.init_pair(PAIR_AXIS_KEY, curses.COLOR_WHITE, curses.COLOR_BLACK)
     curses.init_pair(PAIR_PLAYHEAD, -1, curses.COLOR_WHITE)
     curses.init_pair(PAIR_STATUS_NORMAL,
                      curses.COLOR_BLACK, curses.COLOR_BLUE)
@@ -581,10 +598,10 @@ def main(stdscr):
     playback_thread = None
 
     height, width = stdscr.getmaxyx()
-    min_x_offset = -4
+    min_x_offset = -6
     min_y_offset = 0
     max_y_offset = TOTAL_NOTES - height
-    x_offset = -4
+    x_offset = -6
     y_offset = (DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
 
     insert = False
@@ -616,7 +633,7 @@ def main(stdscr):
         draw_line(stdscr, playhead_position - x_offset, ' ',
                   curses.color_pair(PAIR_PLAYHEAD))
         draw_notes(stdscr, notes, last_note, last_chord, x_offset, y_offset)
-        draw_axis(stdscr, y_offset)
+        draw_axis(stdscr, octave, y_offset)
         draw_status_bar(stdscr, insert, filename, time, message)
 
         stdscr.refresh()
@@ -672,14 +689,14 @@ def main(stdscr):
                 continue
         else:
             # Pan view
-            if input_char.lower() in ('h', 'l'):
+            if input_char.lower() in tuple('hl'):
                 delta = (ARGS.units_per_beat if input_char.isupper() else
                          ARGS.units_per_beat * ARGS.beats_per_measure)
                 if input_char.lower() == 'h':
                     x_offset = max(x_offset - delta, min_x_offset)
                 else:
                     x_offset += delta
-            if input_char.lower() in ('k', 'j'):
+            if input_char.lower() in tuple('kj'):
                 delta = 1 if input_char.isupper() else NOTES_PER_OCTAVE
                 if input_char.lower() == 'j':
                     y_offset = max(y_offset - delta, min_y_offset)
@@ -705,7 +722,7 @@ def main(stdscr):
             y_offset = max(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
                            min_y_offset)
 
-        elif input_char and input_char in '[]{}':  # '' is in every string
+        elif input_char in tuple('[]{}'):
             # Change duration of last note
             if input_char == '[':
                 if last_note is not None:
@@ -735,7 +752,7 @@ def main(stdscr):
             if last_note is not None:
                 duration = ticks_to_units(last_note.duration)
 
-        elif input_char and input_char in ',.<>':  # '' is in every string
+        elif input_char in tuple(',.<>'):
             # Shift last note
             if input_char == ',':
                 if last_note is not None:
