@@ -32,6 +32,7 @@ COLOR_GRAY = 8
 # Color pair numbers
 INSTRUMENT_PAIRS = list(range(1, 8))
 PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
+PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
 
 SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
 FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb']
@@ -43,6 +44,10 @@ SHARP_NAMES = [
 FLAT_NAMES = [
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
 ]
+
+SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
+SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
+SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
 
 def is_chr(char):
@@ -248,6 +253,18 @@ def start_playback(messages, synth):
             synth.noteoff(0, message.note)
 
 
+def draw_lines(window, x_offset, y_offset):
+    height, width = window.getmaxyx()
+    for y, note in enumerate(range(y_offset, y_offset + height)):
+        semitone = note % 12
+        if semitone in SCALE_MAJOR:
+            for x in range(4 - x_offset % 4, width - 1, 4):
+                window.addstr(height - y - 1,
+                              x,
+                              '·',
+                              curses.color_pair(PAIR_LINE))
+
+
 def draw_axis(window, y_offset):
     height = window.getmaxyx()[0]
     for y, note in enumerate(range(y_offset, y_offset + height)):
@@ -257,33 +274,31 @@ def draw_axis(window, y_offset):
                       curses.color_pair(PAIR_AXIS))
 
 
-def draw_notes(window, notes, x_offset, y_offset, min_x_offset):
+def draw_notes(window, notes, x_offset, y_offset):
     height, width = window.getmaxyx()
     for note in notes:
-        duration_units = ticks_to_units(note.duration)
-        string = str(note.name).ljust(duration_units)
-        if len(string) > duration_units:
-            string = ' ' * duration_units
-
         y = height - (note.number - y_offset) - 1
-        x = ticks_to_units(note.start) - x_offset
         if y < 0 or y >= height:
             continue
 
-        if x < min_x_offset:
-            string = string[min_x_offset - x:]
-            x = min_x_offset
-        if x + duration_units >= width:
-            string = string[:width - (x + duration_units) - 1]
-        if string == '':
+        start_x = ticks_to_units(note.start) - x_offset
+        end_x = ticks_to_units(note.end) - x_offset
+        if end_x < 0 or start_x >= width - 1:
             continue
 
         color_pair = INSTRUMENT_PAIRS[note.instrument % len(INSTRUMENT_PAIRS)]
 
-        window.addstr(y,
-                      x,
-                      string,
-                      curses.color_pair(color_pair))
+        for x in range(max(0, start_x), min(width - 1, end_x)):
+            window.addstr(y,
+                          x,
+                          ' ',
+                          curses.color_pair(color_pair))
+
+        if 0 <= start_x < width - 1:
+            window.addstr(y,
+                          start_x,
+                          '▏',
+                          curses.color_pair(color_pair))
 
 
 def exit_curses(synth):
@@ -306,9 +321,9 @@ def main(stdscr):
     for pair in INSTRUMENT_PAIRS:
         curses.init_pair(pair, curses.COLOR_BLACK, pair)
     curses.init_pair(PAIR_AXIS, COLOR_GRAY, curses.COLOR_BLACK)
+    curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
 
     notes = import_midi(ARGS.infile.name) if ARGS.infile else []
-
 
 #   notes = [
 #       Note(60, start=units_to_ticks(0),  duration=units_to_ticks(2)),
@@ -335,8 +350,9 @@ def main(stdscr):
 
     # Loop until user the exits
     while True:
+        draw_lines(stdscr, x_offset, y_offset)
+        draw_notes(stdscr, notes, x_offset, y_offset)
         draw_axis(stdscr, y_offset)
-        draw_notes(stdscr, notes, x_offset, y_offset, min_x_offset)
 
         stdscr.refresh()
 
@@ -359,7 +375,7 @@ def main(stdscr):
         if input_char == 'h':
             x_offset = max(x_offset - 1, min_x_offset)
         elif input_char == 'l':
-            x_offset = x_offset + 1
+            x_offset += 1
         elif input_char == 'j':
             y_offset = max(y_offset - 1, min_y_offset)
         elif input_char == 'k':
