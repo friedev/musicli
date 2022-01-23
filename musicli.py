@@ -36,11 +36,6 @@ PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
 PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
 
-TOTAL_NOTES = 127
-NOTES_PER_OCTAVE = 12
-MAX_VELOCITY = 127
-START_OCTAVE = 4
-
 SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
 FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
 
@@ -56,36 +51,63 @@ SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
 SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
+TOTAL_NOTES = 127
+NOTES_PER_OCTAVE = 12
+MAX_VELOCITY = 127
+DEFAULT_OCTAVE = 4
+DEFAULT_KEY = 0
+DEFAULT_SCALE = SCALE_MAJOR
+
 INSERT_KEYMAP = {
-    'z': 0,   # C3
-    's': 1,   # C#3
-    'x': 2,   # D3
-    'd': 3,   # D#3
-    'c': 4,   # E3
-    'v': 5,   # F3
-    'g': 6,   # F#3
-    'b': 7,   # G3
-    'h': 8,   # G#3
-    'n': 9,   # A3
-    'j': 10,  # A#3
-    'm': 11,  # B3
-    'q': 12,  # C4
-    '2': 13,  # C#4
-    'w': 14,  # D4
-    '3': 15,  # D#4
-    'e': 16,  # E4
-    'r': 17,  # F4
-    '5': 18,  # F#4
-    't': 19,  # G4
-    '6': 20,  # G#4
-    'y': 21,  # A4
-    '7': 22,  # A#4
-    'u': 23,  # B4
-    'i': 24,  # C5
-    '9': 25,  # C#5
-    'o': 26,  # D5
-    '0': 27,  # D#5
-    'p': 28,  # E5
+    'z': 0,   # C
+    's': 1,   # C#
+    'x': 2,   # D
+    'd': 3,   # D#
+    'c': 4,   # E
+    'v': 5,   # F
+    'g': 6,   # F#
+    'b': 7,   # G
+    'h': 8,   # G#
+    'n': 9,   # A
+    'j': 10,  # A#
+    'm': 11,  # B
+    'q': 12,  # C
+    '2': 13,  # C#
+    'w': 14,  # D
+    '3': 15,  # D#
+    'e': 16,  # E
+    'r': 17,  # F
+    '5': 18,  # F#
+    't': 19,  # G
+    '6': 20,  # G#
+    'y': 21,  # A
+    '7': 22,  # A#
+    'u': 23,  # B
+    'i': 24,  # C
+    '9': 25,  # C#
+    'o': 26,  # D
+    '0': 27,  # D#
+    'p': 28,  # E
+}
+
+NAME_TO_NUMBER = {
+    'C':  0,
+    'C#': 1,
+    'Db': 1,
+    'D':  2,
+    'D#': 3,
+    'Eb': 3,
+    'E':  4,
+    'F':  5,
+    'F#': 6,
+    'Gb': 6,
+    'G':  7,
+    'G#': 8,
+    'Ab': 8,
+    'A':  9,
+    'A#': 10,
+    'Bb': 10,
+    'B':  11,
 }
 
 play_playback = Event()
@@ -142,7 +164,7 @@ class Note:
 
     @property
     def name(self):
-        return self.name_in_key('C')
+        return self.name_in_key(DEFAULT_KEY)
 
     @property
     def on_event(self):
@@ -336,11 +358,11 @@ def stop_notes(synth, notes):
         synth.noteoff(0, note.number)
 
 
-def draw_scale_dots(window, x_offset, y_offset):
+def draw_scale_dots(window, key, scale, x_offset, y_offset):
     height, width = window.getmaxyx()
     for y, note in enumerate(range(y_offset, y_offset + height)):
-        semitone = note % 12
-        if semitone in SCALE_MAJOR:
+        semitone = note % NOTES_PER_OCTAVE
+        if semitone in [(number + key) % NOTES_PER_OCTAVE for number in scale]:
             for x in range(-x_offset % 4, width - 1, 4):
                 window.addstr(height - y - 1, x, '·',
                               curses.color_pair(PAIR_LINE))
@@ -437,10 +459,12 @@ def main(stdscr):
     min_y_offset = 0
     max_y_offset = TOTAL_NOTES - height
     x_offset = -4
-    y_offset = (START_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
+    y_offset = (DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
 
     insert = False
-    octave = START_OCTAVE
+    octave = DEFAULT_OCTAVE
+    key = DEFAULT_KEY
+    scale = DEFAULT_SCALE
     time = 0
     duration = ARGS.units_per_beat
     last_note = None
@@ -456,7 +480,7 @@ def main(stdscr):
             x_offset = max(playhead_position - (playhead_position % 16),
                            min_x_offset)
 
-        draw_scale_dots(stdscr, x_offset, y_offset)
+        draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
         draw_measure_lines(stdscr, x_offset)
         write_head_x = time + (0 if last_note is None else duration) - x_offset
         draw_line(stdscr, write_head_x, '▏',
