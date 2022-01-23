@@ -320,8 +320,12 @@ def main(stdscr):
     # Initialize color pairs
     for pair in INSTRUMENT_PAIRS:
         curses.init_pair(pair, curses.COLOR_BLACK, pair)
-    curses.init_pair(PAIR_AXIS, COLOR_GRAY, curses.COLOR_BLACK)
-    curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
+    try:
+        curses.init_pair(PAIR_AXIS, COLOR_GRAY, curses.COLOR_BLACK)
+        curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
+    except ValueError:
+        curses.init_pair(PAIR_AXIS, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
 
     notes = import_midi(ARGS.infile.name) if ARGS.infile else []
 
