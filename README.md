@@ -3,7 +3,7 @@
 MusiCLI (pronounced "musically") is a MIDI sequencer that runs entirely in the terminal.
 
 MusiCLI 1.0 was developed in C++ by Aaron Friesen and David Ryan for [CornHacks 2021](https://unlcornhacks.com).
-It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via FluidSynth.
+It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
 For those interested in the old version, it can be found at the tag `v1.0.0`.
 
 MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com).
@@ -13,9 +13,11 @@ MusiCLI 2.0 presents a piano roll interface, MIDI import and export via [mido](h
 
 - Python 3
 - curses
-- mido
-- FluidSynth
-- PyFluidSynth
+- [mido](https://github.com/mido/mido)
+- [FluidSynth](https://fluidsynth.org)
+- [PyFluidSynth](https://github.com/nwhitehead/pyfluidsynth)
+
+For directions on installing FluidSynth for your platform, refer to [Getting FluidSynth](https://www.fluidsynth.org/download/).
 
 To install the required Python dependencies, run:
 ```sh
@@ -23,7 +25,7 @@ pip3 install -r requirements.txt
 ```
 
 For live playback, you will need a Soundfont in SF2 format.
-I recommend the MuseScore General Soundfont which can be freely downloaded from the [MuseScore handbook](https://musescore.org/en/handbook/3/soundfonts-and-sfz-files)) among other soundfonts.
+I recommend the MuseScore General Soundfont, which can be freely downloaded from the [MuseScore handbook](https://musescore.org/en/handbook/3/soundfonts-and-sfz-files) along with other soundfonts.
 
 ## Usage
 
@@ -80,7 +82,7 @@ Insert mode allows you to insert notes into your song directly by typing them on
 You may always return to normal mode by pressing Escape or `\``.
 
 In insert mode, the keys are laid out like two rows of a piano, with the `z` and `a` rows forming the lower set of white and black keys respectively, and the `q` and number rows forming the higher octave set.
-This is a feature available in DAWs that support keyboard input, such as [LMMS](https://lmms.io/), and is intended to be at least marginally familiar to pianists.
+This is a feature available in DAWs that support keyboard input, such as [LMMS](https://lmms.io), and is intended to be at least marginally familiar to pianists.
 For quick reference, the keys that correspond to each note are listed to the left of them on the left sidebar.
 
 To change where you are editing, use the arrow keys.
@@ -126,3 +128,5 @@ If you want to submit a PR, please follow these guidelines:
 - If you create any new Python source files, copy the license notice from `musicli.py` into them.
 
 If you want to contribute but aren't sure what to work on, you can find a list of tasks in `TODO.md`.
+
+If anyone is interested in maintaining and extending MusiCLI 1.0, feel free to make a fork of this repo based off of the `v1.0.0` tag, although I do not intend to maintain it any further myself.
