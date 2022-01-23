@@ -34,6 +34,7 @@ COLOR_GRAY = 8
 INSTRUMENT_PAIRS = list(range(1, 8))
 PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
+PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
 
 SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
 FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb']
@@ -51,7 +52,10 @@ SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
 play_playback = Event()
-stop_playback = Event()
+restart_playback = Event()
+kill_threads = Event()
+
+playhead_position = 0
 
 
 def is_chr(char):
@@ -250,36 +254,79 @@ def init_synth():
 
 
 def start_playback(messages, synth):
-    for message in messages:
-        sleep(message.time / ARGS.ticks_per_beat / ARGS.beats_per_minute * 60.0)
+    global playhead_position
+    while True:
+        if restart_playback.is_set():
+            restart_playback.clear()
+            play_playback.clear()
+
         play_playback.wait()
-        if stop_playback.is_set():
+        if kill_threads.is_set():
             sys.exit(0)
-        if message.type == 'note_on':
-            synth.noteon(0, message.note, message.velocity)
-        elif message.type == 'note_off':
-            synth.noteoff(0, message.note)
+
+        playhead_position = 0
+        time_to_next_unit = units_to_ticks(1)
+        for message in messages:
+            time_to_next_message = message.time
+            while time_to_next_message > 0:
+                sleep_time = min(time_to_next_unit, time_to_next_message)
+                sleep(sleep_time /
+                      ARGS.ticks_per_beat /
+                      ARGS.beats_per_minute *
+                      60.0)
+
+                time_to_next_unit -= sleep_time
+                time_to_next_message -= sleep_time
+                if time_to_next_unit == 0:
+                    playhead_position += 1
+                    time_to_next_unit = units_to_ticks(1)
+
+                play_playback.wait()
+                if restart_playback.is_set():
+                    break
+                if kill_threads.is_set():
+                    sys.exit(0)
+            if restart_playback.is_set():
+                break
+            if message.type == 'note_on':
+                synth.noteon(0, message.note, message.velocity)
+            elif message.type == 'note_off':
+                synth.noteoff(0, message.note)
 
 
-def draw_lines(window, x_offset, y_offset):
+def draw_scale_dots(window, x_offset, y_offset):
     height, width = window.getmaxyx()
     for y, note in enumerate(range(y_offset, y_offset + height)):
         semitone = note % 12
         if semitone in SCALE_MAJOR:
-            for x in range(4 - x_offset % 4, width - 1, 4):
+            for x in range(-x_offset % 4, width - 1, 4):
                 window.addstr(height - y - 1,
                               x,
                               '·',
                               curses.color_pair(PAIR_LINE))
 
 
-def draw_axis(window, y_offset):
-    height = window.getmaxyx()[0]
-    for y, note in enumerate(range(y_offset, y_offset + height)):
-        window.addstr(height - y - 1,
-                      0,
-                      str(Note(note, 0, 0)).ljust(4),
-                      curses.color_pair(PAIR_AXIS))
+def draw_measure_lines(window, x_offset):
+    height, width = window.getmaxyx()
+    for x in range(-x_offset % 16, width - 1, 16):
+        if x < 0:
+            continue
+        for y in range(0, height):
+            window.addstr(y,
+                          x,
+                          '▏',
+                          curses.color_pair(PAIR_LINE))
+
+
+def draw_playhead(window, x_offset):
+    height, width = window.getmaxyx()
+    x = playhead_position - x_offset
+    if 0 <= x < width - 1:
+        for y in range(0, height):
+            window.addstr(y,
+                          x,
+                          ' ',
+                          curses.color_pair(PAIR_PLAYHEAD))
 
 
 def draw_notes(window, notes, x_offset, y_offset):
@@ -309,9 +356,20 @@ def draw_notes(window, notes, x_offset, y_offset):
                           curses.color_pair(color_pair))
 
 
-def exit_curses(synth, synth_thread):
-    stop_playback.set()
-    synth_thread.join()
+def draw_axis(window, y_offset):
+    height, _ = window.getmaxyx()
+    for y, note in enumerate(range(y_offset, y_offset + height)):
+        window.addstr(height - y - 1,
+                      0,
+                      str(Note(note, 0, 0)).ljust(4),
+                      curses.color_pair(PAIR_AXIS))
+
+
+def exit_curses(synth, playback_thread):
+    curses.cbreak()
+    play_playback.set()
+    kill_threads.set()
+    playback_thread.join()
     if synth is not None:
         synth.delete()
     sys.exit(0)
@@ -336,23 +394,30 @@ def main(stdscr):
     except ValueError:
         curses.init_pair(PAIR_AXIS, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
+    curses.init_pair(PAIR_PLAYHEAD, -1, curses.COLOR_WHITE)
 
     notes = import_midi(ARGS.infile.name) if ARGS.infile else []
 
-    synth_thread = None
+    playback_thread = None
 
-    min_x_offset = 4
+    height, width = stdscr.getmaxyx()
+    min_x_offset = -4
     min_y_offset = 0
-    max_y_offset = 127 - stdscr.getmaxyx()[0]
-    x_offset = 4
-    y_offset = 60 - stdscr.getmaxyx()[0] // 2
+    max_y_offset = 127 - height
+    x_offset = -4
+    y_offset = 60 - height // 2
 
-    needs_input = True
     input_code = None
 
     # Loop until user the exits
     while True:
-        draw_lines(stdscr, x_offset, y_offset)
+        height, width = stdscr.getmaxyx()
+        if play_playback.is_set() and (playhead_position < x_offset or
+                                       playhead_position >= x_offset + width):
+            x_offset = playhead_position - (playhead_position % 16)
+        draw_scale_dots(stdscr, x_offset, y_offset)
+        draw_measure_lines(stdscr, x_offset)
+        draw_playhead(stdscr, x_offset)
         draw_notes(stdscr, notes, x_offset, y_offset)
         draw_axis(stdscr, y_offset)
 
@@ -360,11 +425,8 @@ def main(stdscr):
 
         try:
             input_code = stdscr.getch()
-            # Block for input if auto mode is enabled
-            while needs_input and input_code == curses.ERR:
-                input_code = stdscr.getch()
         except KeyboardInterrupt:
-            exit_curses(SYNTH, synth_thread)
+            exit_curses(SYNTH, playback_thread)
 
         stdscr.erase()
 
@@ -389,26 +451,31 @@ def main(stdscr):
 
         # Start/stop audio playback
         elif input_char == ' ':
-            if synth_thread is None or not synth_thread.is_alive():
-                stop_playback.clear()
+            if playback_thread is None or not playback_thread.is_alive():
+                restart_playback.clear()
                 play_playback.set()
-                synth_thread = Thread(target=start_playback,
-                                      args=(notes_to_messages(notes), SYNTH))
-                synth_thread.start()
+                playback_thread = Thread(target=start_playback,
+                                         args=(notes_to_messages(notes),
+                                               SYNTH))
+                playback_thread.start()
+                curses.halfdelay(1)
             elif play_playback.is_set():
                 play_playback.clear()
+                curses.cbreak()
             else:
                 play_playback.set()
+                curses.halfdelay(1)
 
         if input_code == curses.ascii.LF:
             play_playback.set()
-            stop_playback.set()
+            restart_playback.set()
+            curses.cbreak()
 
         # Quit
         elif input_char == 'q' or\
                 input_code == curses.ascii.ESC or\
                 input_code == curses.ascii.EOT:
-            exit_curses(SYNTH, synth_thread)
+            exit_curses(SYNTH, playback_thread)
 
 
 if __name__ == '__main__':
