@@ -33,7 +33,7 @@ To run MusiCLI from the root directory of the repo, run:
 
 Providing a MIDI file to open is optional.
 Providing an existing MIDI file will import it, while providing a nonexistent file will cause it to be created upon saving.
-You may also provide no file; if you choose to save later, it will be saved under `untitled.mid`
+You may also provide no file; if you choose to save later, it will be saved as `untitled.mid`.
 
 Providing a soundfont is also optional, but live playback will be unavailable unless you do.
 
@@ -109,7 +109,7 @@ These notes are highlighted in white and gray respectively.
 - `w`: Export the song as a MIDI file. **If you imported a file, it will be overwritten.** If you did not import a file but did specify a path, it will be saved to that path. If you did not specify a path, the file will be saved as `untitled.mid`.
 - `i`: Enter insert mode.
 
-#### Insert Mode:
+#### Insert Mode
 
 - All letters and numbers: Insert a note of the corresponding pitch at the current cursor position. Refer to the labels on the left sidebar for this correspondence.
 - Escape/`\``: Return to normal mode.
