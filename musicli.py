@@ -374,7 +374,7 @@ def draw_scale_dots(window, key, scale, x_offset, y_offset):
         semitone = note % NOTES_PER_OCTAVE
         if semitone in [(number + key) % NOTES_PER_OCTAVE for number in scale]:
             for x in range(-x_offset % 4, width - 1, 4):
-                window.addstr(height - y - 1, x, '·',
+                window.addstr(height - y - 1, x, '·' if ARGS.unicode else '.',
                               curses.color_pair(PAIR_LINE))
 
 
@@ -383,7 +383,10 @@ def draw_measure_lines(window, x_offset):
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
     for x in range(-x_offset % units_per_measure,
                    width - 1, units_per_measure):
-        draw_line(window, x, '▏', curses.color_pair(PAIR_LINE))
+        draw_line(window,
+                  x,
+                  '▏' if ARGS.unicode else '|',
+                  curses.color_pair(PAIR_LINE))
 
 
 def draw_line(window, x, string, attr):
@@ -411,7 +414,7 @@ def draw_notes(window, notes, x_offset, y_offset):
             window.addstr(y, x, ' ', curses.color_pair(color_pair))
 
         if 0 <= start_x < width - 1:
-            window.addstr(y, start_x, '▏',
+            window.addstr(y, start_x, '▏' if ARGS.unicode else '[',
                           curses.color_pair(color_pair))
 
         note_width = end_x - start_x
@@ -599,7 +602,7 @@ def main(stdscr):
         draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
         draw_measure_lines(stdscr, x_offset)
         write_head_x = time + (0 if last_note is None else duration) - x_offset
-        draw_line(stdscr, write_head_x, '▏',
+        draw_line(stdscr, write_head_x, '▏' if ARGS.unicode else '|',
                   curses.color_pair(0))
         draw_line(stdscr, playhead_position - x_offset, ' ',
                   curses.color_pair(PAIR_PLAYHEAD))
@@ -700,25 +703,29 @@ def main(stdscr):
                     last_note.duration =\
                         max(last_note.duration - units_to_ticks(1),
                             units_to_ticks(1))
+                else:
+                    duration = max(1, duration - 1)
             elif input_char == ']':
                 if last_note is not None:
                     last_note.duration += units_to_ticks(1)
+                else:
+                    duration += 1
 
             # Change duration of last chord
             elif input_char == '{':
                 for note in last_chord:
                     note.duration = max(note.duration - units_to_ticks(1),
                                         units_to_ticks(1))
+                duration = max(1, duration - 1)
             elif input_char == '}':
                 for note in last_chord:
                     note.duration += units_to_ticks(1)
+                duration += 1
 
             # Update duration and time for next insertion
             if last_note is not None:
                 duration = last_note.duration
                 time = last_note.end
-            else:
-                duration = max(1, duration - 1)
 
         elif input_char and input_char in ',.<>':  # '' is in every string
             # Shift last note
@@ -820,7 +827,7 @@ if __name__ == '__main__':
             nargs='?',
             help='MIDI file to read input from and write output to')
     parser.add_argument(
-            '-s', '--soundfont',
+            '-f', '--soundfont',
             type=FileType('r'),
             help='SF2 soundfont file to use for playback')
     parser.add_argument(
@@ -839,21 +846,32 @@ if __name__ == '__main__':
             default=4,
             help='the number of beats per measure to display in MusiCLI')
     parser.add_argument(
-            '--beats-per-minute',
+            '-t', '--beats-per-minute',
             type=positive_int,
             default=120,
             help='the tempo of the song in beats per minute (BPM)')
     parser.add_argument(
-            '--key',
+            '-k', '--key',
             type=str,
             choices=NAME_TO_NUMBER.keys(),
             default='C',
             help='the key of the song to display in MusiCLI')
     parser.add_argument(
-            '--scale',
+            '-s', '--scale',
             choices=SCALE_NAME_MAP.keys(),
             default='major',
             help='the scale of the song to display in MusiCLI')
+    parser.add_argument(
+            '-u', '--unicode',
+            dest='unicode',
+            action='store_true',
+            help='enable unicode characters (default)')
+    parser.add_argument(
+            '-U', '--no-unicode',
+            dest='unicode',
+            action='store_false',
+            help='disable unicode characters')
+    parser.set_defaults(unicode=True)
 
     # Globals
     ARGS = parser.parse_args()
