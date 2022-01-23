@@ -452,6 +452,7 @@ def main(stdscr):
         if play_playback.is_set() and (playhead_position < x_offset or
                                        playhead_position >= x_offset + width):
             x_offset = playhead_position - (playhead_position % 16)
+
         draw_scale_dots(stdscr, x_offset, y_offset)
         draw_measure_lines(stdscr, x_offset)
         draw_playhead(stdscr, x_offset)
@@ -473,7 +474,7 @@ def main(stdscr):
             input_char = ''
 
         if insert:
-            number = INSERT_KEYMAP.get(input_char)
+            number = INSERT_KEYMAP.get(input_char.lower())
             if number is not None:
                 number += octave * NOTES_PER_OCTAVE
                 note = Note(number,
@@ -483,17 +484,23 @@ def main(stdscr):
                     notes.remove(note)
                 else:
                     notes.append(note)
-                time += duration
+
+                if not input_char.isupper():
+                    time += duration
+                    if insert and time > x_offset + width:
+                        new_offset = time - width // 2
+                        x_offset = new_offset - (new_offset % 16)
+
                 continue
 
         # Pan view
-        if input_char in ('h', curses.KEY_LEFT):
+        if input_char == 'h' or input_code == curses.KEY_LEFT:
             x_offset = max(x_offset - 4, min_x_offset)
-        elif input_char in ('l', curses.KEY_RIGHT):
+        if input_char == 'l' or input_code == curses.KEY_RIGHT:
             x_offset += 4
-        elif input_char in ('j', curses.KEY_DOWN):
+        if input_char == 'j' or input_code == curses.KEY_DOWN:
             y_offset = max(y_offset - 2, min_y_offset)
-        elif input_char in ('k', curses.KEY_UP):
+        if input_char == 'k' or input_code == curses.KEY_UP:
             y_offset = min(y_offset + 2, max_y_offset)
 
         # Enter insert mode
