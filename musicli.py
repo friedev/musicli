@@ -380,7 +380,7 @@ def stop_notes(synth, notes):
 
 def draw_scale_dots(window, key, scale, x_offset, y_offset):
     height, width = window.getmaxyx()
-    for y, note in enumerate(range(y_offset, y_offset + height)):
+    for y, note in enumerate(range(y_offset, y_offset + height - 1)):
         semitone = note % NOTES_PER_OCTAVE
         if semitone in [(number + key) % NOTES_PER_OCTAVE for number in scale]:
             for x in range(-x_offset % 4, width - 1, 4):
@@ -388,7 +388,7 @@ def draw_scale_dots(window, key, scale, x_offset, y_offset):
                               curses.color_pair(PAIR_LINE))
 
 
-def draw_measure_lines(window, x_offset):
+def draw_measures(window, x_offset):
     _, width = window.getmaxyx()
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
     for x in range(-x_offset % units_per_measure,
@@ -396,13 +396,17 @@ def draw_measure_lines(window, x_offset):
         draw_line(window,
                   x,
                   '▏' if ARGS.unicode else '|',
-                  curses.color_pair(PAIR_LINE))
+                  curses.color_pair(PAIR_LINE),
+                  start_y=0)
+        window.addstr(0, x,
+                str((x + x_offset) // units_per_measure),
+                curses.color_pair(PAIR_LINE))
 
 
-def draw_line(window, x, string, attr):
+def draw_line(window, x, string, attr, start_y=1):
     height, width = window.getmaxyx()
     if 0 <= x and x + len(string) < width:
-        for y in range(0, height):
+        for y in range(start_y, height):
             window.addstr(y, x, string, attr)
 
 
@@ -410,7 +414,7 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
     height, width = window.getmaxyx()
     for note in notes:
         y = height - (note.number - y_offset) - 1
-        if y < 0 or y >= height:
+        if y <= 0 or y >= height:
             continue
 
         start_x = ticks_to_units(note.start) - x_offset
@@ -468,12 +472,12 @@ def draw_status_bar(window, insert, filename, time, message):
     filename_text = f' {filename} '
     key_scale_text = f' {ARGS.key} {ARGS.scale} '
     play = playhead_position
-    play_text = ' Play '
-    play_time = f'{play // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'\
-                f':{play // ARGS.units_per_beat % ARGS.beats_per_measure + 1} '
-    edit_text = ' Edit '
-    edit_time = f'{time // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'\
-                f':{time // ARGS.units_per_beat % ARGS.beats_per_measure + 1} '
+    play_text = (
+            f' P{play // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'
+            f':{play // ARGS.units_per_beat % ARGS.beats_per_measure + 1} ')
+    edit_text = (
+            f' E{time // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'
+            f':{time // ARGS.units_per_beat % ARGS.beats_per_measure + 1} ')
     status_attr = curses.color_pair(PAIR_STATUS_INSERT if insert else
                                     PAIR_STATUS_NORMAL)
     x = 0
@@ -498,14 +502,13 @@ def draw_status_bar(window, insert, filename, time, message):
                     len(filename_text) -
                     len(key_scale_text) -
                     len(play_text) -
-                    len(play_time) -
-                    len(edit_text) -
-                    len(edit_time) - 1)
+                    len(edit_text) - 1)
     if filler_width > 0:
         window.addstr(height - 2,
                       x,
                       ' ' * filler_width,
                       status_attr | curses.A_REVERSE)
+        x += filler_width
 
     window.addstr(height - 2,
                   x,
@@ -518,32 +521,16 @@ def draw_status_bar(window, insert, filename, time, message):
     window.addstr(height - 2,
                   x,
                   play_text[:width - x - 1],
-                  status_attr)
+                  status_attr | curses.A_BOLD)
     x += len(play_text)
     if x >= width:
         return
 
     window.addstr(height - 2,
                   x,
-                  play_time[:width - x - 1],
-                  status_attr | curses.A_BOLD)
-    x += len(play_time)
-    if x >= width:
-        return
-
-    window.addstr(height - 2,
-                  x,
                   edit_text[:width - x - 1],
-                  status_attr)
-    x += len(edit_text)
-    if x >= width:
-        return
-
-    window.addstr(height - 2,
-                  x,
-                  edit_time[:width - x - 1],
                   status_attr | curses.A_BOLD)
-    x += len(edit_time)
+    x += len(edit_text)
     if x >= width:
         return
 
@@ -599,10 +586,11 @@ def main(stdscr):
 
     height, width = stdscr.getmaxyx()
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
-    min_x_offset = -6
+    x_sidebar_offset = -6
+    min_x_offset = x_sidebar_offset
     min_y_offset = 0
     max_y_offset = TOTAL_NOTES - height
-    x_offset = -6
+    x_offset = min_x_offset
     y_offset = (DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
 
     insert = False
@@ -624,14 +612,15 @@ def main(stdscr):
         if play_playback.is_set() and (playhead_position < x_offset or
                                        playhead_position >= x_offset + width):
             x_offset = max(playhead_position -
-                           playhead_position % units_per_measure,
+                           playhead_position % units_per_measure -
+                           x_sidebar_offset,
                            min_x_offset)
 
         draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
-        draw_measure_lines(stdscr, x_offset)
+        draw_measures(stdscr, x_offset)
         cursor_x = time + (0 if last_note is None else duration) - x_offset
         draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
-                  curses.color_pair(0))
+                  curses.color_pair(0),)
         draw_line(stdscr, playhead_position - x_offset, ' ',
                   curses.color_pair(PAIR_PLAYHEAD))
         draw_notes(stdscr, notes, last_note, last_chord, x_offset, y_offset)
@@ -667,7 +656,8 @@ def main(stdscr):
                     if insert and time > x_offset + width:
                         new_offset = time - width // 2
                         x_offset = max(new_offset -
-                                       new_offset % units_per_measure,
+                                       new_offset % units_per_measure +
+                                       x_sidebar_offset,
                                        min_x_offset)
                     last_chord = []
 
@@ -715,7 +705,8 @@ def main(stdscr):
 
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
-                x_offset = max(new_offset - new_offset % units_per_measure,
+                x_offset = max(new_offset - new_offset % units_per_measure +
+                               x_sidebar_offset,
                                min_x_offset)
         elif input_code == curses.KEY_UP:
             octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
@@ -780,7 +771,8 @@ def main(stdscr):
 
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
-                x_offset = max(new_offset - new_offset % units_per_measure,
+                x_offset = max(new_offset - new_offset % units_per_measure +
+                               x_sidebar_offset,
                                min_x_offset)
 
         # Delete last note
@@ -795,7 +787,8 @@ def main(stdscr):
             insert = True
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
-                x_offset = max(new_offset - new_offset % units_per_measure,
+                x_offset = max(new_offset - new_offset % units_per_measure +
+                               x_sidebar_offset,
                                min_x_offset)
 
         # Leave insert mode

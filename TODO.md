@@ -1,6 +1,5 @@
 # TODO
 
-- Label measure numbers
 - Import tempo from MIDI
 - Set note velocity, preserve for subsequent notes
 - Prompt/menu to select instrument
