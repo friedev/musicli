@@ -1,12 +1,13 @@
 # TODO
 
+- Looping
 - Import tempo from MIDI
 - Set note velocity, preserve for subsequent notes
 - Prompt/menu to select instrument
 - Preserve instruments when exporting
 - Drums
 - Select notes/chords under the cursor (keybind or automatic)
-- Area select and delete/cut/copy/paste
+- Measure select and delete/cut/copy/paste
 - Transposition
 - Undo/redo stack
 - Stack of previous notes for backspacing, or automatic selection

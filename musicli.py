@@ -399,8 +399,8 @@ def draw_measures(window, x_offset):
                   curses.color_pair(PAIR_LINE),
                   start_y=0)
         window.addstr(0, x,
-                str((x + x_offset) // units_per_measure),
-                curses.color_pair(PAIR_LINE))
+                      str((x + x_offset) // units_per_measure),
+                      curses.color_pair(PAIR_LINE))
 
 
 def draw_line(window, x, string, attr, start_y=1):
@@ -648,7 +648,7 @@ def main(stdscr):
         if insert:
             number = INSERT_KEYMAP.get(input_char.lower())
             if number is not None:
-                if not play_playback.is_set():
+                if SYNTH is not None and not play_playback.is_set():
                     stop_notes(SYNTH, last_chord)
 
                 if last_note is not None and not input_char.isupper():
@@ -677,7 +677,7 @@ def main(stdscr):
                     last_note = note
                     last_chord.append(note)
 
-                if not play_playback.is_set():
+                if SYNTH is not None and not play_playback.is_set():
                     play_notes(SYNTH, last_chord)
                 continue
         else:
@@ -798,7 +798,7 @@ def main(stdscr):
             insert = False
 
         # Start/stop audio playback
-        elif input_char == ' ':
+        elif input_char == ' ' and SYNTH is not None:
             if playback_thread is None or not playback_thread.is_alive():
                 stop_notes(SYNTH, last_chord)
                 restart_playback.clear()
@@ -817,7 +817,7 @@ def main(stdscr):
                 curses.halfdelay(1)
 
         # Restart playback at the beginning
-        elif input_code == curses.ascii.LF:
+        elif input_code == curses.ascii.LF and SYNTH is not None:
             play_playback.set()
             restart_playback.set()
             curses.cbreak()
