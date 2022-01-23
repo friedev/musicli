@@ -335,18 +335,14 @@ def draw_scale_dots(window, x_offset, y_offset):
 def draw_measure_lines(window, x_offset):
     height, width = window.getmaxyx()
     for x in range(-x_offset % 16, width - 1, 16):
-        if x < 0:
-            continue
-        for y in range(0, height):
-            window.addstr(y, x, '▏', curses.color_pair(PAIR_LINE))
+        draw_line(window, x, '▏', curses.color_pair(PAIR_LINE))
 
 
-def draw_playhead(window, x_offset):
+def draw_line(window, x, string, attr):
     height, width = window.getmaxyx()
-    x = playhead_position - x_offset
-    if 0 <= x < width - 1:
+    if 0 <= x + len(string) < width:
         for y in range(0, height):
-            window.addstr(y, x, ' ', curses.color_pair(PAIR_PLAYHEAD))
+            window.addstr(y, x, string, attr)
 
 
 def draw_notes(window, notes, x_offset, y_offset):
@@ -446,7 +442,11 @@ def main(stdscr):
 
         draw_scale_dots(stdscr, x_offset, y_offset)
         draw_measure_lines(stdscr, x_offset)
-        draw_playhead(stdscr, x_offset)
+        write_head_x = time + (0 if last_note is None else duration) - x_offset
+        draw_line(stdscr, write_head_x, '▏',
+                  curses.color_pair(0))
+        draw_line(stdscr, playhead_position - x_offset, ' ',
+                  curses.color_pair(PAIR_PLAYHEAD))
         draw_notes(stdscr, notes, x_offset, y_offset)
         draw_axis(stdscr, y_offset)
 

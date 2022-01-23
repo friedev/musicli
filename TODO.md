@@ -10,9 +10,10 @@
 - Note manipulation in normal mode
 - Play back notes and chords as they're typed (separate synth)
 - Drums
-- Argument for outfile path
+- MIDI input/output support
 - Custom tempo
 - Custom key and scale (affects guidelines and insert mode keymap)
+- Argument for outfile path
 - Generalize start point based on key and octave rather than hardcoded to C4
 - Keybind to toggle snap-to-scale
 - Add flag to disable Unicode
