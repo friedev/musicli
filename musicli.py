@@ -37,6 +37,8 @@ INSTRUMENT_PAIRS = list(range(1, 8))
 PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
 PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
+PAIR_STATUS_NORMAL = len(INSTRUMENT_PAIRS) + 4
+PAIR_STATUS_INSERT = len(INSTRUMENT_PAIRS) + 5
 
 SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
 FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
@@ -291,8 +293,7 @@ def import_midi(infile_path):
     return notes
 
 
-def export_midi(notes):
-    filename = ARGS.file if ARGS.file else DEFAULT_FILE
+def export_midi(notes, filename):
     outfile = MidiFile(ticks_per_beat=ARGS.ticks_per_beat)
 
     track = MidiTrack()
@@ -429,6 +430,101 @@ def draw_axis(window, y_offset):
                       curses.color_pair(PAIR_AXIS))
 
 
+def draw_status_bar(window, insert, filename, time, message):
+    height, width = window.getmaxyx()
+
+    window.addstr(height - 1,
+                  0,
+                  message.ljust(width - 1)[:width - 1],
+                  curses.color_pair(0))
+
+    mode_text = f' {"INSERT" if insert else "NORMAL"} '
+    filename_text = f' {filename} '
+    key_scale_text = f' {ARGS.key} {ARGS.scale} '
+    play = playhead_position
+    play_text = ' Play '
+    play_time = f'{play // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'\
+                f':{play // ARGS.units_per_beat % ARGS.beats_per_measure + 1} '
+    edit_text = ' Edit '
+    edit_time = f'{time // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'\
+                f':{time // ARGS.units_per_beat % ARGS.beats_per_measure + 1} '
+    status_attr = curses.color_pair(PAIR_STATUS_INSERT if insert else
+                                    PAIR_STATUS_NORMAL)
+    x = 0
+    window.addstr(height - 2,
+                  x,
+                  mode_text[:width - x - 1],
+                  status_attr | curses.A_BOLD)
+    x += len(mode_text)
+    if x >= width:
+        return
+
+    window.addstr(height - 2,
+                  x,
+                  filename_text[:width - x - 1],
+                  status_attr | curses.A_REVERSE | curses.A_BOLD)
+    x += len(filename_text)
+    if x >= width:
+        return
+
+    filler_width = (width -
+                    len(mode_text) -
+                    len(filename_text) -
+                    len(key_scale_text) -
+                    len(play_text) -
+                    len(play_time) -
+                    len(edit_text) -
+                    len(edit_time) - 1)
+    if filler_width > 0:
+        window.addstr(height - 2,
+                      x,
+                      ' ' * filler_width,
+                      status_attr | curses.A_REVERSE)
+        x += filler_width
+        if x >= width:
+            return
+
+    window.addstr(height - 2,
+                  x,
+                  key_scale_text[:width - x - 1],
+                  status_attr | curses.A_REVERSE)
+    x += len(key_scale_text)
+    if x >= width:
+        return
+
+    window.addstr(height - 2,
+                  x,
+                  play_text[:width - x - 1],
+                  status_attr)
+    x += len(play_text)
+    if x >= width:
+        return
+
+    window.addstr(height - 2,
+                  x,
+                  play_time[:width - x - 1],
+                  status_attr | curses.A_BOLD)
+    x += len(play_time)
+    if x >= width:
+        return
+
+    window.addstr(height - 2,
+                  x,
+                  edit_text[:width - x - 1],
+                  status_attr)
+    x += len(edit_text)
+    if x >= width:
+        return
+
+    window.addstr(height - 2,
+                  x,
+                  edit_time[:width - x - 1],
+                  status_attr | curses.A_BOLD)
+    x += len(edit_time)
+    if x >= width:
+        return
+
+
 def exit_curses(synth, playback_thread):
     curses.cbreak()
     if playback_thread is not None:
@@ -460,6 +556,10 @@ def main(stdscr):
         curses.init_pair(PAIR_AXIS, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
     curses.init_pair(PAIR_PLAYHEAD, -1, curses.COLOR_WHITE)
+    curses.init_pair(PAIR_STATUS_NORMAL,
+                     curses.COLOR_BLACK, curses.COLOR_BLUE)
+    curses.init_pair(PAIR_STATUS_INSERT,
+                     curses.COLOR_BLACK, curses.COLOR_GREEN)
 
     if ARGS.file and os.path.exists(ARGS.file):
         notes = import_midi(ARGS.file)
@@ -483,6 +583,8 @@ def main(stdscr):
     duration = ARGS.units_per_beat
     last_note = None
     last_chord = []
+    filename = ARGS.file if ARGS.file else DEFAULT_FILE
+    message = ''
 
     input_code = None
 
@@ -503,6 +605,7 @@ def main(stdscr):
                   curses.color_pair(PAIR_PLAYHEAD))
         draw_notes(stdscr, notes, x_offset, y_offset)
         draw_axis(stdscr, y_offset)
+        draw_status_bar(stdscr, insert, filename, time, message)
 
         stdscr.refresh()
 
@@ -512,6 +615,10 @@ def main(stdscr):
             exit_curses(SYNTH, playback_thread)
 
         stdscr.erase()
+
+        # Reset message on next actual keypress
+        if input_code != curses.ERR:
+            message = ''
 
         if curses.ascii.isprint(input_code):
             input_char = chr(input_code)
@@ -528,7 +635,8 @@ def main(stdscr):
                     time += duration
                     if insert and time > x_offset + width:
                         new_offset = time - width // 2
-                        x_offset = new_offset - (new_offset % 16)
+                        x_offset = max(new_offset - (new_offset % 16),
+                                       min_x_offset)
                     last_chord = []
 
                 number += octave * NOTES_PER_OCTAVE
@@ -564,8 +672,14 @@ def main(stdscr):
         # Move the write head and octave
         if input_code == curses.KEY_LEFT:
             time = max(time - duration, 0)
+            if time < x_offset or time >= x_offset + width:
+                new_offset = time - width // 2
+                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
         elif input_code == curses.KEY_RIGHT:
             time += duration
+            if time < x_offset or time >= x_offset + width:
+                new_offset = time - width // 2
+                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
         elif input_code == curses.KEY_UP:
             octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
             y_offset = min(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
@@ -576,36 +690,43 @@ def main(stdscr):
                            min_y_offset)
 
         elif input_char and input_char in '[]{}':  # '' is in every string
+            # Change duration of last note
+            if input_char == '[':
+                if last_note is not None:
+                    last_note.duration =\
+                        max(units_to_ticks(1),
+                            last_note.duration - units_to_ticks(1))
+            elif input_char == ']':
+                if last_note is not None:
+                    last_note.duration += units_to_ticks(1)
+
+            # Change duration of last chord
+            elif input_char == '{':
+                for note in last_chord:
+                    note.duration = max(units_to_ticks(1),
+                                        note.duration - units_to_ticks(1))
+            elif input_char == '}':
+                for note in last_chord:
+                    note.duration += units_to_ticks(1)
+
+            # Update duration and time for next insertion
             if last_note is not None:
-                # Change duration of last note
-                if input_char == '[':
-                    if last_note is not None:
-                        last_note.duration =\
-                            max(units_to_ticks(1),
-                                last_note.duration - units_to_ticks(1))
-                elif input_char == ']':
-                    if last_note is not None:
-                        last_note.duration += units_to_ticks(1)
-
-                # Change duration of last chord
-                elif input_char == '{':
-                    for note in last_chord:
-                        note.duration = max(units_to_ticks(1),
-                                            note.duration - units_to_ticks(1))
-                elif input_char == '}':
-                    for note in last_chord:
-                        note.duration += units_to_ticks(1)
-
-                # Update duration and time for next insertion
                 duration = last_note.duration
                 time = last_note.end
+            else:
+                duration = max(1, duration - 1)
 
         # Enter insert mode
         elif input_char == 'i':
             insert = True
+            if time < x_offset or time >= x_offset + width:
+                new_offset = time - width // 2
+                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
 
         # Leave insert mode
         elif input_code == curses.ascii.ESC:
+            if not insert:
+                message = 'Press Ctrl+C to exit MusiCLI'
             insert = False
 
         # Start/stop audio playback
@@ -635,11 +756,11 @@ def main(stdscr):
 
         # Export to MIDI
         elif input_char == 'w':
-            export_midi(notes)
+            export_midi(notes, filename)
+            message = f'Wrote MIDI to {filename}'
 
-        # Quit
         elif input_char == 'q':
-            exit_curses(SYNTH, playback_thread)
+            message = 'Press Ctrl+C to exit MusiCLI'
 
 
 def positive_int(value):
