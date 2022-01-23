@@ -6,7 +6,7 @@ MusiCLI 1.0 was developed in C++ by Aaron Friesen and David Ryan for [CornHacks 
 It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
 For those interested in the old version, it can be found at the tag `v1.0.0`.
 
-MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com).
+MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place in the main track!
 MusiCLI 2.0 presents a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [PyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
 
 ## Setup
