@@ -778,6 +778,12 @@ def main(stdscr):
                 new_offset = time - width // 2
                 x_offset = max(new_offset - (new_offset % 16), min_x_offset)
 
+        elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
+            if last_note is not None:
+                notes.remove(last_note)
+                last_chord.remove(last_note)
+                last_note = None
+
         # Enter insert mode
         elif input_char == 'i':
             insert = True
@@ -871,18 +877,18 @@ if __name__ == '__main__':
             default=4,
             help='the number of beats per measure to display in MusiCLI')
     parser.add_argument(
-            '-t', '--beats-per-minute',
+            '--beats-per-minute',
             type=positive_int,
             default=120,
             help='the tempo of the song in beats per minute (BPM)')
     parser.add_argument(
-            '-k', '--key',
+            '--key',
             type=str,
             choices=NAME_TO_NUMBER.keys(),
             default='C',
             help='the key of the song to display in MusiCLI')
     parser.add_argument(
-            '-s', '--scale',
+            '--scale',
             choices=SCALE_NAME_MAP.keys(),
             default='major',
             help='the scale of the song to display in MusiCLI')

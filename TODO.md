@@ -1,6 +1,7 @@
 # TODO
 
 - Automatically select notes/chords under the cursor?
+- Stack of previous notes for backspacing, or automatic selection
 - Change velocity in insert mode
 - Drums
 - Undo/redo stack
