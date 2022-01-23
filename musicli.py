@@ -660,14 +660,19 @@ def main(stdscr):
                 continue
         else:
             # Pan view
-            if input_char == 'h':
-                x_offset = max(x_offset - 4, min_x_offset)
-            if input_char == 'l':
-                x_offset += 4
-            if input_char == 'j':
-                y_offset = max(y_offset - 2, min_y_offset)
-            if input_char == 'k':
-                y_offset = min(y_offset + 2, max_y_offset)
+            if input_char.lower() in ('h', 'l'):
+                delta = (ARGS.units_per_beat if input_char.isupper() else
+                         ARGS.units_per_beat * ARGS.beats_per_measure)
+                if input_char.lower() == 'h':
+                    x_offset = max(x_offset - delta, min_x_offset)
+                else:
+                    x_offset += delta
+            if input_char.lower() in ('k', 'j'):
+                delta = 1 if input_char.isupper() else NOTES_PER_OCTAVE
+                if input_char.lower() == 'j':
+                    y_offset = max(y_offset - delta, min_y_offset)
+                if input_char.lower() == 'k':
+                    y_offset = min(y_offset + delta, max_y_offset)
 
         # Move the write head and octave
         if input_code == curses.KEY_LEFT:
