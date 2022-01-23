@@ -39,6 +39,8 @@ PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
 PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
 PAIR_STATUS_NORMAL = len(INSTRUMENT_PAIRS) + 4
 PAIR_STATUS_INSERT = len(INSTRUMENT_PAIRS) + 5
+PAIR_LAST_NOTE = len(INSTRUMENT_PAIRS) + 6
+PAIR_LAST_CHORD = len(INSTRUMENT_PAIRS) + 7
 
 SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
 FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
@@ -396,7 +398,7 @@ def draw_line(window, x, string, attr):
             window.addstr(y, x, string, attr)
 
 
-def draw_notes(window, notes, x_offset, y_offset):
+def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
     height, width = window.getmaxyx()
     for note in notes:
         y = height - (note.number - y_offset) - 1
@@ -408,7 +410,13 @@ def draw_notes(window, notes, x_offset, y_offset):
         if end_x < 0 or start_x >= width - 1:
             continue
 
-        color_pair = INSTRUMENT_PAIRS[note.instrument % len(INSTRUMENT_PAIRS)]
+        if note is last_note:
+            color_pair = PAIR_LAST_NOTE
+        elif note in last_chord:
+            color_pair = PAIR_LAST_CHORD
+        else:
+            color_pair = INSTRUMENT_PAIRS[note.instrument %
+                                          len(INSTRUMENT_PAIRS)]
 
         for x in range(max(0, start_x), min(width - 1, end_x)):
             window.addstr(y, x, ' ', curses.color_pair(color_pair))
@@ -483,9 +491,6 @@ def draw_status_bar(window, insert, filename, time, message):
                       x,
                       ' ' * filler_width,
                       status_attr | curses.A_REVERSE)
-        x += filler_width
-        if x >= width:
-            return
 
     window.addstr(height - 2,
                   x,
@@ -555,14 +560,18 @@ def main(stdscr):
     try:
         curses.init_pair(PAIR_AXIS, COLOR_GRAY, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
+        curses.init_pair(PAIR_LAST_CHORD, curses.COLOR_BLACK, COLOR_GRAY)
     except ValueError:
         curses.init_pair(PAIR_AXIS, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
+        curses.init_pair(PAIR_LAST_CHORD,
+                         curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(PAIR_PLAYHEAD, -1, curses.COLOR_WHITE)
     curses.init_pair(PAIR_STATUS_NORMAL,
                      curses.COLOR_BLACK, curses.COLOR_BLUE)
     curses.init_pair(PAIR_STATUS_INSERT,
                      curses.COLOR_BLACK, curses.COLOR_GREEN)
+    curses.init_pair(PAIR_LAST_NOTE, curses.COLOR_BLACK, curses.COLOR_WHITE)
 
     if ARGS.file and os.path.exists(ARGS.file):
         notes = import_midi(ARGS.file)
@@ -606,7 +615,7 @@ def main(stdscr):
                   curses.color_pair(0))
         draw_line(stdscr, playhead_position - x_offset, ' ',
                   curses.color_pair(PAIR_PLAYHEAD))
-        draw_notes(stdscr, notes, x_offset, y_offset)
+        draw_notes(stdscr, notes, last_note, last_chord, x_offset, y_offset)
         draw_axis(stdscr, y_offset)
         draw_status_bar(stdscr, insert, filename, time, message)
 
@@ -724,8 +733,7 @@ def main(stdscr):
 
             # Update duration and time for next insertion
             if last_note is not None:
-                duration = last_note.duration
-                time = last_note.end
+                duration = ticks_to_units(last_note.duration)
 
         elif input_char and input_char in ',.<>':  # '' is in every string
             # Shift last note
