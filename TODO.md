@@ -1,15 +1,13 @@
 # TODO
 
 - Insert mode
-	- Advance before inserting note
-	- Change note duration: [/]
 	- Change insertion time: left/right
 	- Change octave: up/down
-	- Change instrument: -/+
 	- Change velocity
 - Status bar
 	- Insert mode status indicator
 	- Note details (name, octave, velocity, instrument)
+- Note manipulation in normal mode
 - Play back notes and chords as they're typed (separate synth)
 - Drums
 - Argument for outfile path

@@ -92,17 +92,6 @@ kill_threads = Event()
 playhead_position = 0
 
 
-def is_chr(char):
-    '''
-    Can the given character be cast to a chr?
-    '''
-    try:
-        chr(char)
-        return True
-    except ValueError:
-        return False
-
-
 def ticks_to_beats(ticks):
     return ticks // ARGS.ticks_per_beat
 
@@ -444,6 +433,7 @@ def main(stdscr):
     time = 0
     duration = 4
     last_note = None
+    last_chord = []
 
     input_code = None
 
@@ -469,7 +459,7 @@ def main(stdscr):
 
         stdscr.erase()
 
-        if is_chr(input_code):
+        if curses.ascii.isprint(input_code):
             input_char = chr(input_code)
         else:
             input_char = ''
@@ -482,6 +472,7 @@ def main(stdscr):
                     if insert and time > x_offset + width:
                         new_offset = time - width // 2
                         x_offset = new_offset - (new_offset % 16)
+                    last_chord = []
 
                 number += octave * NOTES_PER_OCTAVE
                 note = Note(number,
@@ -493,17 +484,43 @@ def main(stdscr):
                     notes.append(note)
 
                 last_note = note
+                last_chord.append(note)
                 continue
+        else:
+            # Pan view
+            if input_char == 'h' or input_code == curses.KEY_LEFT:
+                x_offset = max(x_offset - 4, min_x_offset)
+            if input_char == 'l' or input_code == curses.KEY_RIGHT:
+                x_offset += 4
+            if input_char == 'j' or input_code == curses.KEY_DOWN:
+                y_offset = max(y_offset - 2, min_y_offset)
+            if input_char == 'k' or input_code == curses.KEY_UP:
+                y_offset = min(y_offset + 2, max_y_offset)
 
-        # Pan view
-        if input_char == 'h' or input_code == curses.KEY_LEFT:
-            x_offset = max(x_offset - 4, min_x_offset)
-        if input_char == 'l' or input_code == curses.KEY_RIGHT:
-            x_offset += 4
-        if input_char == 'j' or input_code == curses.KEY_DOWN:
-            y_offset = max(y_offset - 2, min_y_offset)
-        if input_char == 'k' or input_code == curses.KEY_UP:
-            y_offset = min(y_offset + 2, max_y_offset)
+        if input_char and input_char in '[]{}':  # '' is in every string
+            if last_note is not None:
+                # Change duration of last note
+                if input_char == '[':
+                    if last_note is not None:
+                        last_note.duration =\
+                            max(units_to_ticks(1),
+                                last_note.duration - units_to_ticks(1))
+                elif input_char == ']':
+                    if last_note is not None:
+                        last_note.duration += units_to_ticks(1)
+
+                # Change duration of last chord
+                elif input_char == '{':
+                    for note in last_chord:
+                        note.duration = max(units_to_ticks(1),
+                                            note.duration - units_to_ticks(1))
+                elif input_char == '}':
+                    for note in last_chord:
+                        note.duration += units_to_ticks(1)
+
+                # Update duration and time for next insertion
+                duration = last_note.duration
+                time = last_note.end
 
         # Enter insert mode
         elif input_char == 'i':
@@ -512,7 +529,6 @@ def main(stdscr):
         # Leave insert mode
         elif input_code == curses.ascii.ESC:
             insert = False
-            last_note = None
 
         # Start/stop audio playback
         elif input_char == ' ':
