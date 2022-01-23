@@ -1,12 +1,23 @@
 # TODO
 
-- Play notes as they're typed (non-blocking and non-overlapping)
-- Step through notes as they're played
-- Easier chord insertion
-- Ability to change velocity, duration, etc. in-editor
-- Custom instruments
-- Multiple drum tracks
-- Extended ranges (button to go up/down by octaves)
-- Change tempo
-- Add documentation
-- Proper modal editing/Vim motions
+- Looping
+- Inserting rests with / (?)
+- Import tempo from MIDI
+- Set note velocity, preserve for subsequent notes
+- Prompt/menu to select instrument
+- Preserve instruments when exporting
+- Toggle visibility of each instrument
+- Drums
+- Select notes/chords under the cursor (keybind or automatic)
+- Measure select and delete/cut/copy/paste
+- Transposition
+- Undo/redo stack
+- Stack of previous notes for backspacing, or automatic selection
+- Keybind to sync playhead to cursor and vice versa
+- View details in normal mode
+- MIDI input/output support
+- Mouse support (if possible)
+- Argument(s) to remap instruments
+- Documentation
+- Screenshot(s)
+- Remove strict dependencies, allow partial functionality in their absence
