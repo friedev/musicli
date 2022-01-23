@@ -179,7 +179,8 @@ class Note:
         return self.start > other.start
 
     def __eq__(self, other):
-        return (self.number == other.number and
+        return (isinstance(other, Note) and
+                self.number == other.number and
                 self.start == other.start and
                 self.instrument == other.instrument)
 
@@ -323,6 +324,16 @@ def start_playback(messages, synth):
                 synth.noteon(0, message.note, message.velocity)
             elif message.type == 'note_off':
                 synth.noteoff(0, message.note)
+
+
+def play_notes(synth, notes):
+    for note in notes:
+        synth.noteon(0, note.number, note.velocity)
+
+
+def stop_notes(synth, notes):
+    for note in notes:
+        synth.noteoff(0, note.number)
 
 
 def draw_scale_dots(window, x_offset, y_offset):
@@ -472,6 +483,9 @@ def main(stdscr):
         if insert:
             number = INSERT_KEYMAP.get(input_char.lower())
             if number is not None:
+                if not play_playback.is_set():
+                    stop_notes(SYNTH, last_chord)
+
                 if last_note is not None and not input_char.isupper():
                     time += duration
                     if insert and time > x_offset + width:
@@ -483,13 +497,20 @@ def main(stdscr):
                 note = Note(number,
                             units_to_ticks(time),
                             units_to_ticks(duration))
+
                 if note in notes:
                     notes.remove(note)
+                    if note == last_note:
+                        last_note = None
+                    if note in last_chord:
+                        last_chord.remove(note)
                 else:
                     notes.append(note)
+                    last_note = note
+                    last_chord.append(note)
 
-                last_note = note
-                last_chord.append(note)
+                if not play_playback.is_set():
+                    play_notes(SYNTH, last_chord)
                 continue
         else:
             # Pan view
@@ -552,6 +573,7 @@ def main(stdscr):
         # Start/stop audio playback
         elif input_char == ' ':
             if playback_thread is None or not playback_thread.is_alive():
+                stop_notes(SYNTH, last_chord)
                 restart_playback.clear()
                 play_playback.set()
                 playback_thread = Thread(target=start_playback,
@@ -563,6 +585,7 @@ def main(stdscr):
                 play_playback.clear()
                 curses.cbreak()
             else:
+                stop_notes(SYNTH, last_chord)
                 play_playback.set()
                 curses.halfdelay(1)
 

@@ -6,7 +6,6 @@
 - Insert mode
 	- Change velocity
 - Note manipulation in normal mode
-- Play back notes and chords as they're typed (separate synth)
 - Drums
 - MIDI input/output support
 - Custom tempo
