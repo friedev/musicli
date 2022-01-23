@@ -15,15 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, ArgumentTypeError, FileType
 import curses
 import curses.ascii
+import os
+import os.path
 import sys
 from threading import Event, Thread
 from time import sleep
 
 from fluidsynth import Synth
-from mido import bpm2tempo, Message, MidiFile, MidiTrack
+from mido import bpm2tempo, Message, MetaMessage, MidiFile, MidiTrack
 
 
 # Python curses does not define curses.COLOR_GRAY, even though it appears to be
@@ -51,12 +53,17 @@ SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
 SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
+SCALE_NAME_MAP = {
+    'major': SCALE_MAJOR,
+    'minor': SCALE_MINOR,
+    'blues': SCALE_BLUES,
+}
+
 TOTAL_NOTES = 127
 NOTES_PER_OCTAVE = 12
 MAX_VELOCITY = 127
 DEFAULT_OCTAVE = 4
-DEFAULT_KEY = 0
-DEFAULT_SCALE = SCALE_MAJOR
+DEFAULT_FILE = 'untitled.mid'
 
 INSERT_KEYMAP = {
     'z': 0,   # C
@@ -164,7 +171,7 @@ class Note:
 
     @property
     def name(self):
-        return self.name_in_key(DEFAULT_KEY)
+        return self.name_in_key(ARGS.key)
 
     @property
     def on_event(self):
@@ -285,18 +292,20 @@ def import_midi(infile_path):
 
 
 def export_midi(notes):
+    filename = ARGS.file if ARGS.file else DEFAULT_FILE
     outfile = MidiFile(ticks_per_beat=ARGS.ticks_per_beat)
 
     track = MidiTrack()
     outfile.tracks.append(track)
 
     track.append(Message('program_change', program=12))
-    track.append(Message('set_tempo', tempo=bpm2tempo(ARGS.beats_per_minute)))
+    track.append(MetaMessage('set_tempo',
+                             tempo=bpm2tempo(ARGS.beats_per_minute)))
 
     for message in notes_to_messages(notes):
         track.append(message)
 
-    outfile.save('test.mid')
+    outfile.save(filename)
 
 
 def init_synth():
@@ -370,7 +379,9 @@ def draw_scale_dots(window, key, scale, x_offset, y_offset):
 
 def draw_measure_lines(window, x_offset):
     _, width = window.getmaxyx()
-    for x in range(-x_offset % 16, width - 1, 16):
+    units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
+    for x in range(-x_offset % units_per_measure,
+                   width - 1, units_per_measure):
         draw_line(window, x, '▏', curses.color_pair(PAIR_LINE))
 
 
@@ -450,7 +461,10 @@ def main(stdscr):
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
     curses.init_pair(PAIR_PLAYHEAD, -1, curses.COLOR_WHITE)
 
-    notes = import_midi(ARGS.infile.name) if ARGS.infile else []
+    if ARGS.file and os.path.exists(ARGS.file):
+        notes = import_midi(ARGS.file)
+    else:
+        notes = []
 
     playback_thread = None
 
@@ -463,8 +477,8 @@ def main(stdscr):
 
     insert = False
     octave = DEFAULT_OCTAVE
-    key = DEFAULT_KEY
-    scale = DEFAULT_SCALE
+    key = NAME_TO_NUMBER[ARGS.key]
+    scale = SCALE_NAME_MAP[ARGS.scale]
     time = 0
     duration = ARGS.units_per_beat
     last_note = None
@@ -628,36 +642,74 @@ def main(stdscr):
             exit_curses(SYNTH, playback_thread)
 
 
+def positive_int(value):
+    int_value = int(value)
+    if int_value <= 0:
+        raise ArgumentTypeError(f'must be a positive integer; was {int_value}')
+    return int_value
+
+
+def optional_file(value):
+    if os.path.isdir(value):
+        raise ArgumentTypeError(f'file cannot be a directory; was {value}')
+    if os.path.exists(value):
+        with open(value, 'r') as file:
+            if not file.readable():
+                raise ArgumentTypeError(f'cannot read {value}')
+    return value
+
+
 if __name__ == '__main__':
     # Parse arguments
     parser = ArgumentParser(
             description='A MIDI sequencer for the terminal')
     parser.add_argument(
+            'file',
+            type=optional_file,
+            nargs='?',
+            help='MIDI file to read input from and write output to')
+    parser.add_argument(
             '-s', '--soundfont',
             type=FileType('r'),
             help='SF2 soundfont file to use for playback')
     parser.add_argument(
-            '-i', '--infile',
-            type=FileType('r'),
-            help='MIDI file to read as input')
-    parser.add_argument(
             '--ticks-per-beat',
-            type=int,
+            type=positive_int,
             default=480,
             help='MIDI ticks per beat (quarter note)')
     parser.add_argument(
             '--units-per-beat',
-            type=int,
+            type=positive_int,
             default=4,
             help='the number of subdivisions per beat to display in MusiCLI')
     parser.add_argument(
+            '--beats-per-measure',
+            type=positive_int,
+            default=4,
+            help='the number of beats per measure to display in MusiCLI')
+    parser.add_argument(
             '--beats-per-minute',
-            type=int,
+            type=positive_int,
             default=120,
             help='the tempo of the song in beats per minute (BPM)')
+    parser.add_argument(
+            '--key',
+            type=str,
+            choices=NAME_TO_NUMBER.keys(),
+            default='C',
+            help='the key of the song to display in MusiCLI')
+    parser.add_argument(
+            '--scale',
+            choices=SCALE_NAME_MAP.keys(),
+            default='major',
+            help='the scale of the song to display in MusiCLI')
 
     # Globals
     ARGS = parser.parse_args()
     SYNTH = init_synth() if ARGS.soundfont else None
+
+    if ARGS.beats_per_minute <= 0:
+        raise ArgumentTypeError('Beats per minute must be positive; was '
+                                f'{ARGS.beats_per_minute}')
 
     curses.wrapper(main)

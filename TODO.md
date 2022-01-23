@@ -11,7 +11,6 @@
 - Custom tempo
 - Custom key and scale (affects guidelines and insert mode keymap)
 - Undo/redo stack
-- Argument for outfile path
 - Keybind to sync playhead and cursor
 - Generalize start point based on key and octave rather than hardcoded to C4
 - Keybind to toggle snap-to-scale
