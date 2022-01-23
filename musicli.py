@@ -36,20 +36,54 @@ PAIR_AXIS = len(INSTRUMENT_PAIRS) + 1
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 2
 PAIR_PLAYHEAD = len(INSTRUMENT_PAIRS) + 3
 
-SHARP_KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#']
-FLAT_KEYS = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb']
+NOTES_PER_OCTAVE = 12
 
-SHARP_NAMES = [
+SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
+FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
+
+SHARP_NAMES = (
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
-]
+)
 
-FLAT_NAMES = [
+FLAT_NAMES = (
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
-]
+)
 
 SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
 SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
+
+INSERT_KEYMAP = {
+    'z': 0,   # C3
+    's': 1,   # C#3
+    'x': 2,   # D3
+    'd': 3,   # D#3
+    'c': 4,   # E3
+    'v': 5,   # F3
+    'g': 6,   # F#3
+    'b': 7,   # G3
+    'h': 8,   # G#3
+    'n': 9,   # A3
+    'j': 10,  # A#3
+    'm': 11,  # B3
+    'q': 12,  # C4
+    '2': 13,  # C#4
+    'w': 14,  # D4
+    '3': 15,  # D#4
+    'e': 16,  # E4
+    'r': 17,  # F4
+    '5': 18,  # F#4
+    't': 19,  # G4
+    '6': 20,  # G#4
+    'y': 21,  # A4
+    '7': 22,  # A#4
+    'u': 23,  # B4
+    'i': 24,  # C5
+    '9': 25,  # C#5
+    'o': 26,  # D5
+    '0': 27,  # D#5
+    'p': 28,  # E5
+}
 
 play_playback = Event()
 restart_playback = Event()
@@ -151,6 +185,11 @@ class Note:
 
     def __gt__(self, other):
         return self.start > other.start
+
+    def __eq__(self, other):
+        return (self.number == other.number and
+                self.start == other.start and
+                self.instrument == other.instrument)
 
 
 class NoteEvent:
@@ -300,9 +339,7 @@ def draw_scale_dots(window, x_offset, y_offset):
         semitone = note % 12
         if semitone in SCALE_MAJOR:
             for x in range(-x_offset % 4, width - 1, 4):
-                window.addstr(height - y - 1,
-                              x,
-                              '·',
+                window.addstr(height - y - 1, x, '·',
                               curses.color_pair(PAIR_LINE))
 
 
@@ -312,10 +349,7 @@ def draw_measure_lines(window, x_offset):
         if x < 0:
             continue
         for y in range(0, height):
-            window.addstr(y,
-                          x,
-                          '▏',
-                          curses.color_pair(PAIR_LINE))
+            window.addstr(y, x, '▏', curses.color_pair(PAIR_LINE))
 
 
 def draw_playhead(window, x_offset):
@@ -323,10 +357,7 @@ def draw_playhead(window, x_offset):
     x = playhead_position - x_offset
     if 0 <= x < width - 1:
         for y in range(0, height):
-            window.addstr(y,
-                          x,
-                          ' ',
-                          curses.color_pair(PAIR_PLAYHEAD))
+            window.addstr(y, x, ' ', curses.color_pair(PAIR_PLAYHEAD))
 
 
 def draw_notes(window, notes, x_offset, y_offset):
@@ -367,9 +398,10 @@ def draw_axis(window, y_offset):
 
 def exit_curses(synth, playback_thread):
     curses.cbreak()
-    play_playback.set()
-    kill_threads.set()
-    playback_thread.join()
+    if playback_thread is not None:
+        play_playback.set()
+        kill_threads.set()
+        playback_thread.join()
     if synth is not None:
         synth.delete()
     sys.exit(0)
@@ -407,6 +439,11 @@ def main(stdscr):
     x_offset = -4
     y_offset = 60 - height // 2
 
+    insert = False
+    octave = 4
+    time = 0
+    duration = 4
+
     input_code = None
 
     # Loop until user the exits
@@ -435,19 +472,37 @@ def main(stdscr):
         else:
             input_char = ''
 
+        if insert:
+            number = INSERT_KEYMAP.get(input_char)
+            if number is not None:
+                number += octave * NOTES_PER_OCTAVE
+                note = Note(number,
+                            units_to_ticks(time),
+                            units_to_ticks(duration))
+                if note in notes:
+                    notes.remove(note)
+                else:
+                    notes.append(note)
+                time += duration
+                continue
+
         # Pan view
-        if input_char == 'h':
+        if input_char in ('h', curses.KEY_LEFT):
             x_offset = max(x_offset - 4, min_x_offset)
-        elif input_char == 'l':
+        elif input_char in ('l', curses.KEY_RIGHT):
             x_offset += 4
-        elif input_char == 'j':
+        elif input_char in ('j', curses.KEY_DOWN):
             y_offset = max(y_offset - 2, min_y_offset)
-        elif input_char == 'k':
+        elif input_char in ('k', curses.KEY_UP):
             y_offset = min(y_offset + 2, max_y_offset)
 
-        # Export to MIDI
-        elif input_char == 'w':
-            export_midi(notes)
+        # Enter insert mode
+        elif input_char == 'i':
+            insert = True
+
+        # Leave insert mode
+        elif input_code == curses.ascii.ESC:
+            insert = False
 
         # Start/stop audio playback
         elif input_char == ' ':
@@ -466,15 +521,18 @@ def main(stdscr):
                 play_playback.set()
                 curses.halfdelay(1)
 
-        if input_code == curses.ascii.LF:
+        # Restart playback at the beginning
+        elif input_code == curses.ascii.LF:
             play_playback.set()
             restart_playback.set()
             curses.cbreak()
 
+        # Export to MIDI
+        elif input_char == 'w':
+            export_midi(notes)
+
         # Quit
-        elif input_char == 'q' or\
-                input_code == curses.ascii.ESC or\
-                input_code == curses.ascii.EOT:
+        elif input_char == 'q':
             exit_curses(SYNTH, playback_thread)
 
 
