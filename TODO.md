@@ -1,10 +1,12 @@
 # TODO
 
 - Looping
+- Inserting rests with / (?)
 - Import tempo from MIDI
 - Set note velocity, preserve for subsequent notes
 - Prompt/menu to select instrument
 - Preserve instruments when exporting
+- Toggle visibility of each instrument
 - Drums
 - Select notes/chords under the cursor (keybind or automatic)
 - Measure select and delete/cut/copy/paste
@@ -14,6 +16,8 @@
 - Keybind to sync playhead to cursor and vice versa
 - View details in normal mode
 - MIDI input/output support
+- Mouse support (if possible)
 - Argument(s) to remap instruments
 - Documentation
 - Screenshot(s)
+- Remove strict dependencies, allow partial functionality in their absence

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # MusiCLI - A MIDI sequencer for the terminal
-# Copyright (C) 2021 Aaron Friesen
+# Copyright (C) 2022 Aaron Friesen
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -696,7 +696,7 @@ def main(stdscr):
                 if input_char.lower() == 'k':
                     y_offset = min(y_offset + delta, max_y_offset)
 
-        # Move the write head and octave
+        # Move the editing cursor and octave
         if input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
             if input_code == curses.KEY_LEFT:
                 time = max(time - duration, 0)
