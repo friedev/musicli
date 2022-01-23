@@ -50,6 +50,7 @@ SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
 SCALE_MINOR = [0, 2, 3, 5, 7, 8, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
 
+play_playback = Event()
 stop_playback = Event()
 
 
@@ -251,6 +252,7 @@ def init_synth():
 def start_playback(messages, synth):
     for message in messages:
         sleep(message.time / ARGS.ticks_per_beat / ARGS.beats_per_minute * 60.0)
+        play_playback.wait()
         if stop_playback.is_set():
             sys.exit(0)
         if message.type == 'note_on':
@@ -373,13 +375,13 @@ def main(stdscr):
 
         # Pan view
         if input_char == 'h':
-            x_offset = max(x_offset - 1, min_x_offset)
+            x_offset = max(x_offset - 4, min_x_offset)
         elif input_char == 'l':
-            x_offset += 1
+            x_offset += 4
         elif input_char == 'j':
-            y_offset = max(y_offset - 1, min_y_offset)
+            y_offset = max(y_offset - 2, min_y_offset)
         elif input_char == 'k':
-            y_offset = min(y_offset + 1, max_y_offset)
+            y_offset = min(y_offset + 2, max_y_offset)
 
         # Export to MIDI
         elif input_char == 'w':
@@ -389,11 +391,18 @@ def main(stdscr):
         elif input_char == ' ':
             if synth_thread is None or not synth_thread.is_alive():
                 stop_playback.clear()
+                play_playback.set()
                 synth_thread = Thread(target=start_playback,
                                       args=(notes_to_messages(notes), SYNTH))
                 synth_thread.start()
+            elif play_playback.is_set():
+                play_playback.clear()
             else:
-                stop_playback.set()
+                play_playback.set()
+
+        if input_code == curses.ascii.LF:
+            play_playback.set()
+            stop_playback.set()
 
         # Quit
         elif input_char == 'q' or\
