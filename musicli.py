@@ -675,13 +675,12 @@ def main(stdscr):
                     y_offset = min(y_offset + delta, max_y_offset)
 
         # Move the write head and octave
-        if input_code == curses.KEY_LEFT:
-            time = max(time - duration, 0)
-            if time < x_offset or time >= x_offset + width:
-                new_offset = time - width // 2
-                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
-        elif input_code == curses.KEY_RIGHT:
-            time += duration
+        if input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
+            if input_code == curses.KEY_LEFT:
+                time = max(time - duration, 0)
+            elif input_code == curses.KEY_RIGHT:
+                time += duration
+
             if time < x_offset or time >= x_offset + width:
                 new_offset = time - width // 2
                 x_offset = max(new_offset - (new_offset % 16), min_x_offset)
@@ -699,8 +698,8 @@ def main(stdscr):
             if input_char == '[':
                 if last_note is not None:
                     last_note.duration =\
-                        max(units_to_ticks(1),
-                            last_note.duration - units_to_ticks(1))
+                        max(last_note.duration - units_to_ticks(1),
+                            units_to_ticks(1))
             elif input_char == ']':
                 if last_note is not None:
                     last_note.duration += units_to_ticks(1)
@@ -708,8 +707,8 @@ def main(stdscr):
             # Change duration of last chord
             elif input_char == '{':
                 for note in last_chord:
-                    note.duration = max(units_to_ticks(1),
-                                        note.duration - units_to_ticks(1))
+                    note.duration = max(note.duration - units_to_ticks(1),
+                                        units_to_ticks(1))
             elif input_char == '}':
                 for note in last_chord:
                     note.duration += units_to_ticks(1)
@@ -720,6 +719,32 @@ def main(stdscr):
                 time = last_note.end
             else:
                 duration = max(1, duration - 1)
+
+        elif input_char and input_char in ',.<>':  # '' is in every string
+            # Shift last note
+            if input_char == ',':
+                if last_note is not None:
+                    last_note.start = max(last_note.start - units_to_ticks(1),
+                                          0)
+                time = max(0, time - 1)
+            elif input_char == '.':
+                if last_note is not None:
+                    last_note.start += units_to_ticks(1)
+                time += 1
+
+            # Shift last chord
+            elif input_char == '<':
+                for note in last_chord:
+                    note.start = max(note.start - units_to_ticks(1), 0)
+                time = max(0, time - 1)
+            elif input_char == '>':
+                for note in last_chord:
+                    note.start += units_to_ticks(1)
+                time += 1
+
+            if time < x_offset or time >= x_offset + width:
+                new_offset = time - width // 2
+                x_offset = max(new_offset - (new_offset % 16), min_x_offset)
 
         # Enter insert mode
         elif input_char == 'i':
