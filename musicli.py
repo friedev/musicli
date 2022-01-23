@@ -443,6 +443,7 @@ def main(stdscr):
     octave = 4
     time = 0
     duration = 4
+    last_note = None
 
     input_code = None
 
@@ -476,6 +477,12 @@ def main(stdscr):
         if insert:
             number = INSERT_KEYMAP.get(input_char.lower())
             if number is not None:
+                if last_note is not None and not input_char.isupper():
+                    time += duration
+                    if insert and time > x_offset + width:
+                        new_offset = time - width // 2
+                        x_offset = new_offset - (new_offset % 16)
+
                 number += octave * NOTES_PER_OCTAVE
                 note = Note(number,
                             units_to_ticks(time),
@@ -485,12 +492,7 @@ def main(stdscr):
                 else:
                     notes.append(note)
 
-                if not input_char.isupper():
-                    time += duration
-                    if insert and time > x_offset + width:
-                        new_offset = time - width // 2
-                        x_offset = new_offset - (new_offset % 16)
-
+                last_note = note
                 continue
 
         # Pan view
@@ -510,6 +512,7 @@ def main(stdscr):
         # Leave insert mode
         elif input_code == curses.ascii.ESC:
             insert = False
+            last_note = None
 
         # Start/stop audio playback
         elif input_char == ' ':

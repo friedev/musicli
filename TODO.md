@@ -1,17 +1,23 @@
 # TODO
 
-- Add flag to disable Unicode
-- Argument for outfile path
-- Change key and scale (affects guidelines and insert mode keymap)
-- Snap to scale
-- Argument(s) to remap instruments
-- Generalize start point based on key and octave rather than hardcoded to C4
 - Insert mode
 	- Advance before inserting note
-	- Insert mode status indicator
 	- Change note duration: [/]
 	- Change insertion time: left/right
 	- Change octave: up/down
 	- Change instrument: -/+
+	- Change velocity
+- Status bar
+	- Insert mode status indicator
+	- Note details (name, octave, velocity, instrument)
+- Play back notes and chords as they're typed (separate synth)
+- Drums
+- Argument for outfile path
+- Custom tempo
+- Custom key and scale (affects guidelines and insert mode keymap)
+- Generalize start point based on key and octave rather than hardcoded to C4
+- Keybind to toggle snap-to-scale
+- Add flag to disable Unicode
+- Argument(s) to remap instruments
 - Documentation
 - Screenshot(s)
