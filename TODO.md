@@ -1,6 +1,5 @@
 # TODO
 
-- Looping
 - Inserting rests with / (?)
 - Import tempo from MIDI
 - Set note velocity, preserve for subsequent notes
@@ -15,7 +14,7 @@
 - Stack of previous notes for backspacing, or automatic selection
 - Keybind to sync playhead to cursor and vice versa
 - View details in normal mode
-- MIDI input/output support
+- MIDI port I/O
 - Mouse support (if possible)
 - Argument(s) to remap instruments
 - Documentation

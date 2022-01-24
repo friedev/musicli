@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from argparse import ArgumentParser, ArgumentTypeError, FileType
+from bisect import bisect_left, insort
 import curses
 import curses.ascii
 import os
@@ -134,6 +135,7 @@ restart_playback = Event()
 kill_threads = Event()
 
 playhead_position = 0
+events = []
 
 
 def ticks_to_beats(ticks):
@@ -160,22 +162,63 @@ def units_to_ticks(units):
     return int(units / ARGS.units_per_beat * ARGS.ticks_per_beat)
 
 
-class Note:
+class DummyEvent:
+    def __init__(self, time):
+        self.time = time
+
+    def __lt__(self, other):
+        return self.time < other.time
+
+    def __gt__(self, other):
+        return self.time > other.time
+
+
+class NoteEvent:
     def __init__(self,
+                 on,
                  number,
-                 start,
-                 duration,
+                 time,
+                 duration=None,
                  velocity=MAX_VELOCITY,
                  instrument=0):
+        if time < 0:
+            raise ValueError(f'Time must be non-negative; was {time}')
+
+        self.on = on
         self.number = number
-        self.start = start
-        self.duration = duration
+        self.time = time
         self.velocity = velocity
         self.instrument = instrument
 
+        if duration is not None:
+            if duration < 0:
+                raise ValueError('Duration must be non-negative; was '
+                                 f'{duration}')
+
+            pair_time = time + duration if on else time - duration
+            self.pair = NoteEvent(not on,
+                                  number,
+                                  pair_time,
+                                  velocity=velocity,
+                                  instrument=instrument)
+            self.pair.pair = self
+        else:
+            self.pair = None
+
+    @property
+    def start(self):
+        return self.time if self.on else self.pair.time
+
     @property
     def end(self):
-        return self.start + self.duration
+        return self.pair.time if self.on else self.time
+
+    @property
+    def duration(self):
+        if self.on:
+            return self.pair.time - self.time
+        else:
+            return self.time - self.pair.time
 
     @property
     def semitone(self):
@@ -184,22 +227,6 @@ class Note:
     @property
     def name(self):
         return self.name_in_key(ARGS.key)
-
-    @property
-    def on_event(self):
-        return NoteEvent(on=True,
-                         number=self.number,
-                         time=self.start,
-                         velocity=self.velocity,
-                         instrument=self.instrument)
-
-    @property
-    def off_event(self):
-        return NoteEvent(on=False,
-                         number=self.number,
-                         time=self.start + self.duration,
-                         velocity=self.velocity,
-                         instrument=self.instrument)
 
     def name_in_key(self, key):
         if key in SHARP_KEYS:
@@ -210,40 +237,30 @@ class Note:
     def octave(self):
         return self.number // 12 - 1
 
+    def set_duration(self, duration):
+        if duration < 0:
+            raise ValueError(f'Duration must be non-negative; was {duration}')
+
+        if self.on:
+            self.pair.time = self.time + duration
+        else:
+            self.time = self.pair.time + duration
+
     def __repr__(self):
         return self.name + str(self.octave)
-
-    def __lt__(self, other):
-        return self.start < other.start
-
-    def __gt__(self, other):
-        return self.start > other.start
-
-    def __eq__(self, other):
-        return (isinstance(other, Note) and
-                self.number == other.number and
-                self.start == other.start and
-                self.instrument == other.instrument)
-
-
-class NoteEvent:
-    def __init__(self,
-                 on,
-                 number,
-                 time,
-                 velocity=MAX_VELOCITY,
-                 instrument=0):
-        self.on = on
-        self.number = number
-        self.time = time
-        self.velocity = velocity
-        self.instrument = instrument
 
     def __lt__(self, other):
         return self.time < other.time
 
     def __gt__(self, other):
         return self.time > other.time
+
+    def __eq__(self, other):
+        return (isinstance(other, NoteEvent) and
+                self.on == other.on and
+                self.number == other.number and
+                self.time == other.time and
+                self.instrument == other.instrument)
 
 
 def notes_to_events(notes):
@@ -288,7 +305,7 @@ def messages_to_notes(messages, instrument=0):
             for note in notes_on:
                 if note.number == message.note:
                     note.duration = time - note.start
-                    notes.append(note)
+                    insort(notes, note)
                     notes_on.remove(note)
     return notes
 
@@ -327,7 +344,8 @@ def init_synth():
     return synth
 
 
-def start_playback(messages, synth):
+def start_playback(synth):
+    global events
     global playhead_position
     while True:
         if restart_playback.is_set():
@@ -338,34 +356,37 @@ def start_playback(messages, synth):
         if kill_threads.is_set():
             sys.exit(0)
 
+        time = 0
+        event_index = 0
         playhead_position = 0
-        time_to_next_unit = units_to_ticks(1)
-        for message in messages:
-            time_to_next_message = message.time
-            while time_to_next_message > 0:
-                sleep_time = min(time_to_next_unit, time_to_next_message)
-                sleep(sleep_time /
-                      ARGS.ticks_per_beat /
-                      ARGS.beats_per_minute *
-                      60.0)
+        next_unit_time = units_to_ticks(1)
+        while event_index < len(events):
+            next_event = events[event_index]
+            delta = min(next_unit_time, next_event.time) - time
+            sleep(delta /
+                  ARGS.ticks_per_beat /
+                  ARGS.beats_per_minute *
+                  60.0)
 
-                time_to_next_unit -= sleep_time
-                time_to_next_message -= sleep_time
-                if time_to_next_unit == 0:
-                    playhead_position += 1
-                    time_to_next_unit = units_to_ticks(1)
+            event_index = bisect_left(events, NoteEvent(False, 0, time))
+            next_event = events[event_index]
 
-                play_playback.wait()
-                if restart_playback.is_set():
-                    break
-                if kill_threads.is_set():
-                    sys.exit(0)
+            if time == next_unit_time:
+                playhead_position += 1
+                next_unit_time = units_to_ticks(1)
+
+            play_playback.wait()
             if restart_playback.is_set():
                 break
-            if message.type == 'note_on':
-                synth.noteon(0, message.note, message.velocity)
-            elif message.type == 'note_off':
-                synth.noteoff(0, message.note)
+            if kill_threads.is_set():
+                sys.exit(0)
+
+            if time == next_event.time:
+                if next_event.on:
+                    synth.noteon(0, next_event.number, next_event.velocity)
+                else:
+                    synth.noteoff(0, next_event.number)
+                event_index += 1
 
 
 def play_notes(synth, notes):
@@ -582,6 +603,7 @@ def main(stdscr):
     else:
         notes = []
 
+    global playhead_position
     playback_thread = None
 
     height, width = stdscr.getmaxyx()
@@ -673,7 +695,7 @@ def main(stdscr):
                     if note in last_chord:
                         last_chord.remove(note)
                 else:
-                    notes.append(note)
+                    insort(notes, note)
                     last_note = note
                     last_chord.append(note)
 
@@ -748,32 +770,37 @@ def main(stdscr):
                 duration = ticks_to_units(last_note.duration)
 
         elif input_char in tuple(',.<>'):
-            # Shift last note
-            if input_char == ',':
-                if last_note is not None:
-                    last_note.start = max(last_note.start - units_to_ticks(1),
-                                          0)
-                time = max(0, time - 1)
-            elif input_char == '.':
-                if last_note is not None:
-                    last_note.start += units_to_ticks(1)
-                time += 1
+            if last_note is not None:
+                # Shift last note
+                if input_char in tuple(',.'):
+                    if input_char == ',':
+                        new_start = max(last_note.start - units_to_ticks(1), 0)
+                        time = max(0, time - 1)
+                    else:
+                        new_start = last_note.start + units_to_ticks(1)
+                        time += 1
+                    notes.remove(last_note)
+                    last_note.start = new_start
+                    insort(notes, last_note)
 
-            # Shift last chord
-            elif input_char == '<':
-                for note in last_chord:
-                    note.start = max(note.start - units_to_ticks(1), 0)
-                time = max(0, time - 1)
-            elif input_char == '>':
-                for note in last_chord:
-                    note.start += units_to_ticks(1)
-                time += 1
+                # Shift last chord
+                else:
+                    for note in last_chord:
+                        notes.remove(note)
+                        if input_char == '<':
+                            note.start = max(note.start - units_to_ticks(1), 0)
+                            time = max(0, time - 1)
+                        else:
+                            note.start += units_to_ticks(1)
+                            time += 1
+                        insort(notes, note)
 
-            if time < x_offset or time >= x_offset + width:
-                new_offset = time - width // 2
-                x_offset = max(new_offset - new_offset % units_per_measure +
-                               x_sidebar_offset,
-                               min_x_offset)
+                if time < x_offset or time >= x_offset + width:
+                    new_offset = time - width // 2
+                    x_offset = max(new_offset -
+                                   new_offset % units_per_measure +
+                                   x_sidebar_offset,
+                                   min_x_offset)
 
         # Delete last note
         elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
