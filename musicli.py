@@ -26,7 +26,8 @@ from threading import Event, Thread
 from time import sleep
 
 from fluidsynth import Synth
-from mido import bpm2tempo, Message, MetaMessage, MidiFile, MidiTrack
+from mido import (bpm2tempo, Message, MetaMessage, MidiFile, MidiTrack,
+                  tempo2bpm)
 
 
 # On some systems, color 8 is gray, but this is not fully standardized
@@ -408,8 +409,13 @@ def import_midi(infile_path):
     ARGS.ticks_per_beat = infile.ticks_per_beat
 
     notes = []
+    set_tempo = False
     for i, track in enumerate(infile.tracks):
         notes += messages_to_notes(track, i)
+        for message in track:
+            if not set_tempo and message.type == 'set_tempo':
+                ARGS.beats_per_minute = tempo2bpm(message.tempo)
+                set_tempo = True
     return sorted(notes)
 
 
@@ -699,7 +705,7 @@ def main(stdscr):
                 play_playback.is_set() and
                 (PLAYHEAD < x_offset or PLAYHEAD >= x_offset + width)):
             x_offset = max(PLAYHEAD -
-                           PLAYHEAD % units_per_measure -
+                           PLAYHEAD % units_per_measure +
                            x_sidebar_offset,
                            min_x_offset)
 
