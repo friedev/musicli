@@ -43,8 +43,12 @@ PAIR_STATUS_INSERT = len(INSTRUMENT_PAIRS) + 6
 PAIR_LAST_NOTE = len(INSTRUMENT_PAIRS) + 7
 PAIR_LAST_CHORD = len(INSTRUMENT_PAIRS) + 8
 
-SHARP_KEYS = ('C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#')
+SHARP_KEYS = ('G', 'D', 'A', 'E', 'B', 'F#', 'C#')
 FLAT_KEYS = ('F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb')
+
+COMMON_NAMES = (
+    'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'
+)
 
 SHARP_NAMES = (
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
@@ -134,8 +138,39 @@ play_playback = Event()
 restart_playback = Event()
 kill_threads = Event()
 
-playhead_position = 0
-events = []
+PLAYHEAD = 0
+SONG = None
+MESSAGE = ''
+
+
+def number_to_name(number, scale=None):
+    semitone = number % NOTES_PER_OCTAVE
+    octave = number // NOTES_PER_OCTAVE - 1
+    if scale in SHARP_KEYS:
+        letter = SHARP_NAMES[semitone]
+    elif scale in FLAT_KEYS:
+        letter = FLAT_NAMES[semitone]
+    else:
+        letter = COMMON_NAMES[semitone]
+    return f'{letter}{octave}'
+
+
+def name_to_number(name):
+    number = NAME_TO_NUMBER.get(name[:2])
+    if number is None:
+        number = NAME_TO_NUMBER.get(name[:1])
+        if number is None:
+            raise ValueError(f'{name} is not a valid note name')
+        octave = name[1:]
+    else:
+        octave = name[2:]
+
+    if octave == '':
+        return number
+    try:
+        return number + int(octave) * NOTES_PER_OCTAVE
+    except ValueError as e:
+        raise ValueError(f'{name} is not a valid note name') from e
 
 
 def ticks_to_beats(ticks):
@@ -162,7 +197,7 @@ def units_to_ticks(units):
     return int(units / ARGS.units_per_beat * ARGS.ticks_per_beat)
 
 
-class DummyEvent:
+class DummyNote:
     def __init__(self, time):
         self.time = time
 
@@ -173,7 +208,51 @@ class DummyEvent:
         return self.time > other.time
 
 
-class NoteEvent:
+class Song:
+    def __init__(self):
+        self.notes = []
+
+    def add(self, note, pair=True):
+        if note in self:
+            raise ValueError('Note {note} is already in this song')
+
+        insort(self.notes, note)
+        if pair:
+            if note.pair is None:
+                raise ValueError('Note {note} is unpaired')
+            if note.pair in self:
+                raise ValueError('Note {note.pair} is already in this song')
+            insort(self.notes, note.pair)
+
+    def remove(self, note, pair=True):
+        self.notes.remove(note)
+        if pair:
+            if note.pair is None:
+                raise ValueError('Note {note} is unpaired')
+            self.notes.remove(note.pair)
+
+    def move(self, note, time):
+        self.remove(note)
+        note.move(time)
+        self.add(note)
+
+    def get_next_index(self, time):
+        return bisect_left(self.notes, DummyNote(time))
+
+    def get_next_note(self, time):
+        return self[self.get_next_index(time)]
+
+    def __len__(self):
+        return len(self.notes)
+
+    def __getitem__(self, key):
+        return self.notes[key]
+
+    def __contains__(self, item):
+        return item in self.notes
+
+
+class Note:
     def __init__(self,
                  on,
                  number,
@@ -190,20 +269,27 @@ class NoteEvent:
         self.velocity = velocity
         self.instrument = instrument
 
+        self.pair = None
         if duration is not None:
-            if duration < 0:
-                raise ValueError('Duration must be non-negative; was '
-                                 f'{duration}')
+            if duration <= 0:
+                raise ValueError(f'Duration must be positive; was {duration}')
+            self.make_pair(time + duration if on else time - duration)
 
-            pair_time = time + duration if on else time - duration
-            self.pair = NoteEvent(not on,
-                                  number,
-                                  pair_time,
-                                  velocity=velocity,
-                                  instrument=instrument)
-            self.pair.pair = self
-        else:
-            self.pair = None
+    def make_pair(self, time):
+        if time < 0:
+            raise ValueError(f'Time must be non-negative; was {time}')
+
+        if ((self.on and time <= self.time) or
+                (not self.on and time >= self.time)):
+            raise ValueError('Note must end strictly after it starts; '
+                             f'times were {self.time} and {time}')
+
+        self.pair = Note(not self.on,
+                         self.number,
+                         time,
+                         velocity=self.velocity,
+                         instrument=self.instrument)
+        self.pair.pair = self
 
     @property
     def start(self):
@@ -217,8 +303,7 @@ class NoteEvent:
     def duration(self):
         if self.on:
             return self.pair.time - self.time
-        else:
-            return self.time - self.pair.time
+        return self.time - self.pair.time
 
     @property
     def semitone(self):
@@ -226,27 +311,41 @@ class NoteEvent:
 
     @property
     def name(self):
-        return self.name_in_key(ARGS.key)
+        return number_to_name(self.number)
 
     def name_in_key(self, key):
-        if key in SHARP_KEYS:
-            return SHARP_NAMES[self.semitone]
-        return FLAT_NAMES[self.semitone]
+        return number_to_name(self.number, key)
 
     @property
     def octave(self):
         return self.number // 12 - 1
 
-    def set_duration(self, duration):
-        if duration < 0:
-            raise ValueError(f'Duration must be non-negative; was {duration}')
-
+    def move(self, time):
         if self.on:
-            self.pair.time = self.time + duration
+            if self.pair is not None:
+                self.pair.time = time + self.duration
         else:
-            self.time = self.pair.time + duration
+            if self.pair is not None:
+                self.pair.time = time - self.duration
+                if self.pair.time < 0:
+                    raise ValueError('New start time must be non-negative; '
+                                     f'was {time}')
+        self.time = time
 
-    def __repr__(self):
+    def set_duration(self, duration):
+        if duration <= 0:
+            raise ValueError(f'Duration must be positive; was {duration}')
+
+        if self.pair is None:
+            self.make_pair(self.time + duration if self.on else
+                           self.time - duration)
+        else:
+            if self.on:
+                self.pair.time = self.time + duration
+            else:
+                self.time = self.pair.time + duration
+
+    def __str__(self):
         return self.name + str(self.octave)
 
     def __lt__(self, other):
@@ -256,58 +355,52 @@ class NoteEvent:
         return self.time > other.time
 
     def __eq__(self, other):
-        return (isinstance(other, NoteEvent) and
+        return (isinstance(other, Note) and
                 self.on == other.on and
                 self.number == other.number and
                 self.time == other.time and
                 self.instrument == other.instrument)
 
 
-def notes_to_events(notes):
-    events = []
-    for note in notes:
-        events.append(note.on_event)
-        events.append(note.off_event)
-    return sorted(events)
-
-
-def events_to_messages(events):
+def notes_to_messages(notes):
     messages = []
     last_time = 0
-    for event in events:
-        delta = event.time - last_time
-        message_type = 'note_on' if event.on else 'note_off'
+    for note in notes:
+        delta = note.time - last_time
+        message_type = 'note_on' if note.on else 'note_off'
         messages.append(Message(message_type,
-                                note=event.number,
-                                velocity=event.velocity,
+                                note=note.number,
+                                velocity=note.velocity,
                                 time=delta))
-        last_time = event.time
+        last_time = note.time
     return messages
 
 
-def notes_to_messages(notes):
-    return events_to_messages(notes_to_events(notes))
-
-
 def messages_to_notes(messages, instrument=0):
-    notes_on = []
     notes = []
+    active_notes = []
     time = 0
     for message in messages:
         time += message.time
         if message.type == 'note_on':
-            notes_on.append(Note(number=message.note,
-                                 start=time,
-                                 duration=0,
-                                 velocity=message.velocity,
-                                 instrument=instrument))
+            active_notes.append(Note(True,
+                                     number=message.note,
+                                     time=time,
+                                     velocity=message.velocity,
+                                     instrument=instrument))
         elif message.type == 'note_off':
-            for note in notes_on:
+            for note in active_notes:
                 if note.number == message.note:
-                    note.duration = time - note.start
-                    insort(notes, note)
-                    notes_on.remove(note)
-    return notes
+                    duration = time - note.time
+                    if duration == 0:
+                        active_notes.remove(note)
+                    else:
+                        note.set_duration(duration)
+                        notes.append(note)
+                        notes.append(note.pair)
+                        active_notes.remove(note)
+                        break
+    return sorted(notes)
 
 
 def import_midi(infile_path):
@@ -317,7 +410,7 @@ def import_midi(infile_path):
     notes = []
     for i, track in enumerate(infile.tracks):
         notes += messages_to_notes(track, i)
-    return notes
+    return sorted(notes)
 
 
 def export_midi(notes, filename):
@@ -345,35 +438,38 @@ def init_synth():
 
 
 def start_playback(synth):
-    global events
-    global playhead_position
+    global PLAYHEAD
     while True:
         if restart_playback.is_set():
             restart_playback.clear()
-            play_playback.clear()
 
         play_playback.wait()
         if kill_threads.is_set():
             sys.exit(0)
 
+        if len(SONG) == 0:
+            play_playback.clear()
+            continue
+
         time = 0
-        event_index = 0
-        playhead_position = 0
+        note_index = 0
+        PLAYHEAD = 0
         next_unit_time = units_to_ticks(1)
-        while event_index < len(events):
-            next_event = events[event_index]
-            delta = min(next_unit_time, next_event.time) - time
+        next_note = SONG[note_index]
+        while note_index < len(SONG):
+            delta = min(next_unit_time, next_note.time) - time
             sleep(delta /
                   ARGS.ticks_per_beat /
                   ARGS.beats_per_minute *
                   60.0)
 
-            event_index = bisect_left(events, NoteEvent(False, 0, time))
-            next_event = events[event_index]
+            time += delta
 
             if time == next_unit_time:
-                playhead_position += 1
-                next_unit_time = units_to_ticks(1)
+                PLAYHEAD += 1
+                next_unit_time += units_to_ticks(1)
+                note_index = SONG.get_next_index(time)
+                next_note = SONG[note_index]
 
             play_playback.wait()
             if restart_playback.is_set():
@@ -381,17 +477,20 @@ def start_playback(synth):
             if kill_threads.is_set():
                 sys.exit(0)
 
-            if time == next_event.time:
-                if next_event.on:
-                    synth.noteon(0, next_event.number, next_event.velocity)
+            while note_index < len(SONG) and time == next_note.time:
+                if next_note.on:
+                    synth.noteon(0, next_note.number, next_note.velocity)
                 else:
-                    synth.noteoff(0, next_event.number)
-                event_index += 1
+                    synth.noteoff(0, next_note.number)
+                note_index += 1
+                if note_index < len(SONG):
+                    next_note = SONG[note_index]
 
 
 def play_notes(synth, notes):
     for note in notes:
-        synth.noteon(0, note.number, note.velocity)
+        if note.on:
+            synth.noteon(0, note.number, note.velocity)
 
 
 def stop_notes(synth, notes):
@@ -419,8 +518,10 @@ def draw_measures(window, x_offset):
                   '▏' if ARGS.unicode else '|',
                   curses.color_pair(PAIR_LINE),
                   start_y=0)
+
+        # Measure number
         window.addstr(0, x,
-                      str((x + x_offset) // units_per_measure),
+                      str((x + x_offset) // units_per_measure + 1),
                       curses.color_pair(PAIR_LINE))
 
 
@@ -432,8 +533,12 @@ def draw_line(window, x, string, attr, start_y=1):
 
 
 def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
+    # TODO only iterate over notes in view (assume list is sorted)
     height, width = window.getmaxyx()
     for note in notes:
+        if not note.on:
+            continue
+
         y = height - (note.number - y_offset) - 1
         if y <= 0 or y >= height:
             continue
@@ -468,7 +573,7 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
 def draw_sidebar(window, octave, y_offset):
     height, _ = window.getmaxyx()
     for y, number in enumerate(range(y_offset, y_offset + height)):
-        note = Note(number, 0, 0)
+        note = number_to_name(number)
         insert_key = number - octave * NOTES_PER_OCTAVE
         window.addstr(height - y - 1,
                       0,
@@ -492,7 +597,7 @@ def draw_status_bar(window, insert, filename, time, message):
     mode_text = f' {"INSERT" if insert else "NORMAL"} '
     filename_text = f' {filename} '
     key_scale_text = f' {ARGS.key} {ARGS.scale} '
-    play = playhead_position
+    play = PLAYHEAD
     play_text = (
             f' P{play // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'
             f':{play // ARGS.units_per_beat % ARGS.beats_per_measure + 1} ')
@@ -556,20 +661,279 @@ def draw_status_bar(window, insert, filename, time, message):
         return
 
 
-def exit_curses(synth, playback_thread):
-    curses.cbreak()
-    if playback_thread is not None:
-        play_playback.set()
-        kill_threads.set()
-        playback_thread.join()
-    if synth is not None:
-        synth.delete()
-    sys.exit(0)
-
-
 def main(stdscr):
     '''
     Main render/input loop.
+    '''
+    global SONG, MESSAGE
+    SONG = Song()
+
+    if ARGS.file and os.path.exists(ARGS.file):
+        SONG.notes = import_midi(ARGS.file)
+
+    height, width = stdscr.getmaxyx()
+    units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
+    x_sidebar_offset = -6
+    min_x_offset = x_sidebar_offset
+    min_y_offset = 0
+    max_y_offset = TOTAL_NOTES - height
+    x_offset = min_x_offset
+    y_offset = (DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
+
+    insert = False
+    octave = DEFAULT_OCTAVE
+    key = NAME_TO_NUMBER[ARGS.key]
+    scale = SCALE_NAME_MAP[ARGS.scale]
+    time = 0
+    duration = ARGS.units_per_beat
+    last_note = None
+    last_chord = []
+    filename = ARGS.file if ARGS.file else DEFAULT_FILE
+
+    input_code = None
+
+    # Loop until user the exits
+    while True:
+        height, width = stdscr.getmaxyx()
+        if (not insert and
+                play_playback.is_set() and
+                (PLAYHEAD < x_offset or PLAYHEAD >= x_offset + width)):
+            x_offset = max(PLAYHEAD -
+                           PLAYHEAD % units_per_measure -
+                           x_sidebar_offset,
+                           min_x_offset)
+
+        draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
+        draw_measures(stdscr, x_offset)
+        cursor_x = time + (0 if last_note is None else duration) - x_offset
+        draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
+                  curses.color_pair(0),)
+        draw_line(stdscr, PLAYHEAD - x_offset, ' ',
+                  curses.color_pair(PAIR_PLAYHEAD))
+        draw_notes(stdscr, SONG.notes, last_note, last_chord, x_offset,
+                   y_offset)
+        draw_sidebar(stdscr, octave, y_offset)
+        draw_status_bar(stdscr, insert, filename, time, MESSAGE)
+
+        stdscr.refresh()
+
+        # Get keyboard input
+        # Don't handle KeyboardInterrupt here, because when the song is
+        # playing, raw mode will not block on this check, so the
+        # KeyboardInterrupt is likely to be generated during some other part of
+        # the loop
+        # Thus, handling it outside the method allows for more consistently
+        # graceful shutdowns
+        input_code = stdscr.getch()
+
+        stdscr.erase()
+
+        # Reset message on next actual keypress
+        if input_code != curses.ERR:
+            MESSAGE = ''
+
+        if curses.ascii.isprint(input_code):
+            input_char = chr(input_code)
+        else:
+            input_char = ''
+
+        if insert:
+            number = INSERT_KEYMAP.get(input_char.lower())
+            if number is not None:
+                if SYNTH is not None and not play_playback.is_set():
+                    stop_notes(SYNTH, last_chord)
+
+                if last_note is not None and not input_char.isupper():
+                    time += duration
+                    if insert and time > x_offset + width:
+                        new_offset = time - width // 2
+                        x_offset = max(new_offset -
+                                       new_offset % units_per_measure +
+                                       x_sidebar_offset,
+                                       min_x_offset)
+                    last_chord = []
+
+                number += octave * NOTES_PER_OCTAVE
+                note = Note(True,
+                            number,
+                            units_to_ticks(time),
+                            units_to_ticks(duration))
+
+                if note in SONG.notes:
+                    SONG.remove(note)
+                    if note == last_note:
+                        last_note = None
+                    if note in last_chord:
+                        last_chord.remove(note)
+                else:
+                    SONG.add(note)
+                    last_note = note
+                    last_chord.append(note)
+
+                if SYNTH is not None and not play_playback.is_set():
+                    play_notes(SYNTH, last_chord)
+                continue
+        else:
+            # Pan view
+            if input_char.lower() in tuple('hl'):
+                delta = (ARGS.units_per_beat if input_char.isupper() else
+                         ARGS.units_per_beat * ARGS.beats_per_measure)
+                if input_char.lower() == 'h':
+                    x_offset = max(x_offset - delta, min_x_offset)
+                else:
+                    x_offset += delta
+            if input_char.lower() in tuple('kj'):
+                delta = 1 if input_char.isupper() else NOTES_PER_OCTAVE
+                if input_char.lower() == 'j':
+                    y_offset = max(y_offset - delta, min_y_offset)
+                if input_char.lower() == 'k':
+                    y_offset = min(y_offset + delta, max_y_offset)
+
+            # Enter insert mode
+            elif input_char in tuple('ia'):
+                insert = True
+
+                if input_char == 'a':
+                    time += duration
+
+                if time < x_offset or time >= x_offset + width:
+                    new_offset = time - width // 2
+                    x_offset = max(new_offset -
+                                   new_offset % units_per_measure +
+                                   x_sidebar_offset,
+                                   min_x_offset)
+
+            # Export to MIDI
+            elif input_char == 'w':
+                export_midi(SONG.notes, filename)
+                MESSAGE = f'Wrote MIDI to {filename}'
+
+            # Q doesn't quit
+            # It'd be too easy to do on accident because it's C in insert mode
+            # Instead, show a message saying how to exit
+            elif input_char == 'q':
+                MESSAGE = 'Press Ctrl+C to exit MusiCLI'
+
+        # Move the editing cursor and octave
+        if input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
+            if input_code == curses.KEY_LEFT:
+                time = max(time - duration, 0)
+            elif input_code == curses.KEY_RIGHT:
+                time += duration
+
+            if time < x_offset or time >= x_offset + width:
+                new_offset = time - width // 2
+                x_offset = max(new_offset - new_offset % units_per_measure +
+                               x_sidebar_offset,
+                               min_x_offset)
+        elif input_code == curses.KEY_UP:
+            octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
+            y_offset = min(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
+                           max_y_offset)
+        elif input_code == curses.KEY_DOWN:
+            octave = max(octave - 1, 0)
+            y_offset = max(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
+                           min_y_offset)
+
+        elif input_char in tuple('[]{}'):
+            # Change duration of last note
+            if input_char == '[':
+                if last_note is not None:
+                    last_note.set_duration(max(last_note.duration -
+                                               units_to_ticks(1),
+                                               units_to_ticks(1)))
+                else:
+                    duration = max(1, duration - 1)
+            elif input_char == ']':
+                if last_note is not None:
+                    last_note.set_duration(last_note.duration +
+                                           units_to_ticks(1))
+                else:
+                    duration += 1
+
+            # Change duration of last chord
+            elif input_char == '{':
+                for note in last_chord:
+                    note.set_duration(max(note.duration - units_to_ticks(1),
+                                          units_to_ticks(1)))
+                duration = max(1, duration - 1)
+            elif input_char == '}':
+                for note in last_chord:
+                    note.set_duration(note.duration + units_to_ticks(1))
+                duration += 1
+
+            # Update duration and time for next insertion
+            if last_note is not None:
+                duration = ticks_to_units(last_note.duration)
+
+        elif input_char in tuple(',.<>'):
+            if last_note is not None:
+                # Shift last note
+                if input_char in tuple(',.'):
+                    if input_char == ',':
+                        new_start = max(last_note.start - units_to_ticks(1), 0)
+                        time = max(0, time - 1)
+                    else:
+                        new_start = last_note.start + units_to_ticks(1)
+                        time += 1
+                    SONG.move(last_note, new_start)
+
+                # Shift last chord
+                else:
+                    for note in last_chord:
+                        if input_char == '<':
+                            note.start = max(note.start - units_to_ticks(1), 0)
+                            time = max(0, time - 1)
+                        else:
+                            note.start += units_to_ticks(1)
+                            time += 1
+                        SONG.move(note, new_start)
+
+                if time < x_offset or time >= x_offset + width:
+                    new_offset = time - width // 2
+                    x_offset = max(new_offset -
+                                   new_offset % units_per_measure +
+                                   x_sidebar_offset,
+                                   min_x_offset)
+
+        # Delete last note
+        elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
+            if last_note is not None:
+                SONG.remove(last_note)
+                last_chord.remove(last_note)
+                last_note = None
+
+        # Leave insert mode or deselect notes
+        elif input_char == '`' or input_code == curses.ascii.ESC:
+            if not insert:
+                if last_note is None:
+                    MESSAGE = 'Press Ctrl+C to exit MusiCLI'
+                else:
+                    last_note = None
+                    last_chord = []
+            else:
+                insert = False
+
+        # Start/stop audio playback
+        elif input_char == ' ' and SYNTH is not None:
+            if play_playback.is_set():
+                play_playback.clear()
+                curses.cbreak()
+            else:
+                stop_notes(SYNTH, last_chord)
+                play_playback.set()
+                curses.halfdelay(1)
+
+        # Restart playback at the beginning
+        elif input_code == curses.ascii.LF and SYNTH is not None:
+            restart_playback.set()
+            play_playback.set()
+            curses.halfdelay(1)
+
+
+def wrapper(stdscr):
+    '''
+    Wrapper method for curses. Hosts actual main method.
     '''
     # Hide curses cursor
     curses.curs_set(0)
@@ -598,264 +962,19 @@ def main(stdscr):
                      curses.COLOR_BLACK, curses.COLOR_GREEN)
     curses.init_pair(PAIR_LAST_NOTE, curses.COLOR_BLACK, curses.COLOR_WHITE)
 
-    if ARGS.file and os.path.exists(ARGS.file):
-        notes = import_midi(ARGS.file)
-    else:
-        notes = []
+    playback_thread = Thread(target=start_playback, args=[SYNTH])
+    playback_thread.start()
 
-    global playhead_position
-    playback_thread = None
-
-    height, width = stdscr.getmaxyx()
-    units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
-    x_sidebar_offset = -6
-    min_x_offset = x_sidebar_offset
-    min_y_offset = 0
-    max_y_offset = TOTAL_NOTES - height
-    x_offset = min_x_offset
-    y_offset = (DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
-
-    insert = False
-    octave = DEFAULT_OCTAVE
-    key = NAME_TO_NUMBER[ARGS.key]
-    scale = SCALE_NAME_MAP[ARGS.scale]
-    time = 0
-    duration = ARGS.units_per_beat
-    last_note = None
-    last_chord = []
-    filename = ARGS.file if ARGS.file else DEFAULT_FILE
-    message = ''
-
-    input_code = None
-
-    # Loop until user the exits
-    while True:
-        height, width = stdscr.getmaxyx()
-        if play_playback.is_set() and (playhead_position < x_offset or
-                                       playhead_position >= x_offset + width):
-            x_offset = max(playhead_position -
-                           playhead_position % units_per_measure -
-                           x_sidebar_offset,
-                           min_x_offset)
-
-        draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
-        draw_measures(stdscr, x_offset)
-        cursor_x = time + (0 if last_note is None else duration) - x_offset
-        draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
-                  curses.color_pair(0),)
-        draw_line(stdscr, playhead_position - x_offset, ' ',
-                  curses.color_pair(PAIR_PLAYHEAD))
-        draw_notes(stdscr, notes, last_note, last_chord, x_offset, y_offset)
-        draw_sidebar(stdscr, octave, y_offset)
-        draw_status_bar(stdscr, insert, filename, time, message)
-
-        stdscr.refresh()
-
-        try:
-            input_code = stdscr.getch()
-        except KeyboardInterrupt:
-            exit_curses(SYNTH, playback_thread)
-
-        stdscr.erase()
-
-        # Reset message on next actual keypress
-        if input_code != curses.ERR:
-            message = ''
-
-        if curses.ascii.isprint(input_code):
-            input_char = chr(input_code)
-        else:
-            input_char = ''
-
-        if insert:
-            number = INSERT_KEYMAP.get(input_char.lower())
-            if number is not None:
-                if SYNTH is not None and not play_playback.is_set():
-                    stop_notes(SYNTH, last_chord)
-
-                if last_note is not None and not input_char.isupper():
-                    time += duration
-                    if insert and time > x_offset + width:
-                        new_offset = time - width // 2
-                        x_offset = max(new_offset -
-                                       new_offset % units_per_measure +
-                                       x_sidebar_offset,
-                                       min_x_offset)
-                    last_chord = []
-
-                number += octave * NOTES_PER_OCTAVE
-                note = Note(number,
-                            units_to_ticks(time),
-                            units_to_ticks(duration))
-
-                if note in notes:
-                    notes.remove(note)
-                    if note == last_note:
-                        last_note = None
-                    if note in last_chord:
-                        last_chord.remove(note)
-                else:
-                    insort(notes, note)
-                    last_note = note
-                    last_chord.append(note)
-
-                if SYNTH is not None and not play_playback.is_set():
-                    play_notes(SYNTH, last_chord)
-                continue
-        else:
-            # Pan view
-            if input_char.lower() in tuple('hl'):
-                delta = (ARGS.units_per_beat if input_char.isupper() else
-                         ARGS.units_per_beat * ARGS.beats_per_measure)
-                if input_char.lower() == 'h':
-                    x_offset = max(x_offset - delta, min_x_offset)
-                else:
-                    x_offset += delta
-            if input_char.lower() in tuple('kj'):
-                delta = 1 if input_char.isupper() else NOTES_PER_OCTAVE
-                if input_char.lower() == 'j':
-                    y_offset = max(y_offset - delta, min_y_offset)
-                if input_char.lower() == 'k':
-                    y_offset = min(y_offset + delta, max_y_offset)
-
-        # Move the editing cursor and octave
-        if input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
-            if input_code == curses.KEY_LEFT:
-                time = max(time - duration, 0)
-            elif input_code == curses.KEY_RIGHT:
-                time += duration
-
-            if time < x_offset or time >= x_offset + width:
-                new_offset = time - width // 2
-                x_offset = max(new_offset - new_offset % units_per_measure +
-                               x_sidebar_offset,
-                               min_x_offset)
-        elif input_code == curses.KEY_UP:
-            octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
-            y_offset = min(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
-                           max_y_offset)
-        elif input_code == curses.KEY_DOWN:
-            octave = max(octave - 1, 0)
-            y_offset = max(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
-                           min_y_offset)
-
-        elif input_char in tuple('[]{}'):
-            # Change duration of last note
-            if input_char == '[':
-                if last_note is not None:
-                    last_note.duration =\
-                        max(last_note.duration - units_to_ticks(1),
-                            units_to_ticks(1))
-                else:
-                    duration = max(1, duration - 1)
-            elif input_char == ']':
-                if last_note is not None:
-                    last_note.duration += units_to_ticks(1)
-                else:
-                    duration += 1
-
-            # Change duration of last chord
-            elif input_char == '{':
-                for note in last_chord:
-                    note.duration = max(note.duration - units_to_ticks(1),
-                                        units_to_ticks(1))
-                duration = max(1, duration - 1)
-            elif input_char == '}':
-                for note in last_chord:
-                    note.duration += units_to_ticks(1)
-                duration += 1
-
-            # Update duration and time for next insertion
-            if last_note is not None:
-                duration = ticks_to_units(last_note.duration)
-
-        elif input_char in tuple(',.<>'):
-            if last_note is not None:
-                # Shift last note
-                if input_char in tuple(',.'):
-                    if input_char == ',':
-                        new_start = max(last_note.start - units_to_ticks(1), 0)
-                        time = max(0, time - 1)
-                    else:
-                        new_start = last_note.start + units_to_ticks(1)
-                        time += 1
-                    notes.remove(last_note)
-                    last_note.start = new_start
-                    insort(notes, last_note)
-
-                # Shift last chord
-                else:
-                    for note in last_chord:
-                        notes.remove(note)
-                        if input_char == '<':
-                            note.start = max(note.start - units_to_ticks(1), 0)
-                            time = max(0, time - 1)
-                        else:
-                            note.start += units_to_ticks(1)
-                            time += 1
-                        insort(notes, note)
-
-                if time < x_offset or time >= x_offset + width:
-                    new_offset = time - width // 2
-                    x_offset = max(new_offset -
-                                   new_offset % units_per_measure +
-                                   x_sidebar_offset,
-                                   min_x_offset)
-
-        # Delete last note
-        elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
-            if last_note is not None:
-                notes.remove(last_note)
-                last_chord.remove(last_note)
-                last_note = None
-
-        # Enter insert mode
-        elif input_char == 'i':
-            insert = True
-            if time < x_offset or time >= x_offset + width:
-                new_offset = time - width // 2
-                x_offset = max(new_offset - new_offset % units_per_measure +
-                               x_sidebar_offset,
-                               min_x_offset)
-
-        # Leave insert mode
-        elif input_char == '`' or input_code == curses.ascii.ESC:
-            if not insert:
-                message = 'Press Ctrl+C to exit MusiCLI'
-            insert = False
-
-        # Start/stop audio playback
-        elif input_char == ' ' and SYNTH is not None:
-            if playback_thread is None or not playback_thread.is_alive():
-                stop_notes(SYNTH, last_chord)
-                restart_playback.clear()
-                play_playback.set()
-                playback_thread = Thread(target=start_playback,
-                                         args=(notes_to_messages(notes),
-                                               SYNTH))
-                playback_thread.start()
-                curses.halfdelay(1)
-            elif play_playback.is_set():
-                play_playback.clear()
-                curses.cbreak()
-            else:
-                stop_notes(SYNTH, last_chord)
-                play_playback.set()
-                curses.halfdelay(1)
-
-        # Restart playback at the beginning
-        elif input_code == curses.ascii.LF and SYNTH is not None:
-            play_playback.set()
-            restart_playback.set()
-            curses.cbreak()
-
-        # Export to MIDI
-        elif input_char == 'w':
-            export_midi(notes, filename)
-            message = f'Wrote MIDI to {filename}'
-
-        elif input_char == 'q':
-            message = 'Press Ctrl+C to exit MusiCLI'
+    try:
+        main(stdscr)
+    finally:
+        curses.cbreak()
+        play_playback.set()
+        kill_threads.set()
+        playback_thread.join()
+        if SYNTH is not None:
+            SYNTH.delete()
+        sys.exit(0)
 
 
 def positive_int(value):
@@ -939,4 +1058,4 @@ if __name__ == '__main__':
         raise ArgumentTypeError('Beats per minute must be positive; was '
                                 f'{ARGS.beats_per_minute}')
 
-    curses.wrapper(main)
+    curses.wrapper(wrapper)

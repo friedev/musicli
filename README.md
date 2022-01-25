@@ -109,6 +109,8 @@ These notes are highlighted in white and gray respectively.
 - `hjkl`: Pan the view. Holding Shift will cause you to pan in smaller steps.
 - `w`: Export the song as a MIDI file. **If you imported a file, it will be overwritten.** If you did not import a file but did specify a path, it will be saved to that path. If you did not specify a path, the file will be saved as `untitled.mid`.
 - `i`: Enter insert mode.
+- `a`: Enter insert mode and advance one step.
+- Escape/`\``: Deselect notes.
 
 #### Insert Mode
 
