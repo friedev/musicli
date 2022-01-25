@@ -4,7 +4,8 @@
 - Select notes by instrument (useful for track exporting too)
 - Prompt/menu to select instrument
 - Focus on specific instrument (hide and mute others)
-- Note labels for drums
+- Display drum names on sidebar when editing drums
+- Separate drum window with a custom set of drums to use?
 - Inserting rests with / (?)
 - Set note velocity, preserve for subsequent notes
 - Select notes/chords under the cursor (keybind or automatic)

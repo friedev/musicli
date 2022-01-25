@@ -327,9 +327,13 @@ class Note:
 
     @property
     def name(self):
+        if self.is_drum:
+            return str(self.number)
         return number_to_name(self.number, octave=False)
 
     def name_in_key(self, key):
+        if self.is_drum:
+            return str(self.number)
         return number_to_name(self.number, key, octave=False)
 
     @property
@@ -634,8 +638,6 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
             window.addstr(y, start_x, '▏' if ARGS.unicode else '[',
                           curses.color_pair(color_pair))
 
-        if note.is_drum:
-            continue
 
         note_width = end_x - start_x
         if note_width >= 4 and (0 <= start_x + 1 and
