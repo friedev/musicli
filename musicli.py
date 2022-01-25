@@ -34,7 +34,7 @@ from mido import (bpm2tempo, Message, MetaMessage, MidiFile, MidiTrack,
 COLOR_GRAY = 8
 
 # Color pair numbers
-INSTRUMENT_PAIRS = list(range(1, 8))
+INSTRUMENT_PAIRS = list(range(1, 7))
 PAIR_DRUM = len(INSTRUMENT_PAIRS)
 PAIR_SIDEBAR_NOTE = len(INSTRUMENT_PAIRS) + 1
 PAIR_SIDEBAR_KEY = len(INSTRUMENT_PAIRS) + 2
@@ -153,15 +153,17 @@ SONG = None
 MESSAGE = ''
 
 
-def number_to_name(number, scale=None):
+def number_to_name(number, scale=None, octave=True):
     semitone = number % NOTES_PER_OCTAVE
-    octave = number // NOTES_PER_OCTAVE - 1
     if scale in SHARP_KEYS:
         letter = SHARP_NAMES[semitone]
     elif scale in FLAT_KEYS:
         letter = FLAT_NAMES[semitone]
     else:
         letter = COMMON_NAMES[semitone]
+    if not octave:
+        return letter
+    octave = number // NOTES_PER_OCTAVE - 1
     return f'{letter}{octave}'
 
 
@@ -325,10 +327,10 @@ class Note:
 
     @property
     def name(self):
-        return number_to_name(self.number)
+        return number_to_name(self.number, octave=False)
 
     def name_in_key(self, key):
-        return number_to_name(self.number, key)
+        return number_to_name(self.number, key, octave=False)
 
     @property
     def octave(self):
@@ -878,7 +880,7 @@ def main(stdscr):
             # Export to MIDI
             elif input_char == 'w':
                 export_midi(SONG.notes, filename)
-                #MESSAGE = f'Wrote MIDI to {filename}'
+                MESSAGE = f'Wrote MIDI to {filename}'
 
             # Q doesn't quit
             # It'd be too easy to do on accident because it's C in insert mode

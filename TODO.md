@@ -3,7 +3,7 @@
 - Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
 - Select notes by instrument (useful for track exporting too)
 - Prompt/menu to select instrument
-- Show/hide and mute/unmute each instrument
+- Focus on specific instrument (hide and mute others)
 - Note labels for drums
 - Inserting rests with / (?)
 - Set note velocity, preserve for subsequent notes
