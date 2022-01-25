@@ -910,7 +910,7 @@ def main(stdscr):
                 last_note = None
 
         # Leave insert mode or deselect notes
-        elif input_char == '`' or input_code == curses.ascii.ESC:
+        elif input_code == curses.ascii.ESC:
             if not insert:
                 if last_note is None:
                     MESSAGE = 'Press Ctrl+C to exit MusiCLI'
@@ -1063,5 +1063,7 @@ if __name__ == '__main__':
     if ARGS.beats_per_minute <= 0:
         raise ArgumentTypeError('Beats per minute must be positive; was '
                                 f'{ARGS.beats_per_minute}')
+
+    os.environ.setdefault('ESCDELAY', '25')
 
     curses.wrapper(wrapper)

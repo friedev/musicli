@@ -79,7 +79,7 @@ The default mode is Normal mode, which allows you to navigate freely and use mor
 
 You can enter Insert mode by pressing `i`.
 Insert mode allows you to insert notes into your song directly by typing them on the keyboard.
-You may always return to normal mode by pressing Escape or Backtick.
+You may always return to normal mode by pressing Escape.
 
 In insert mode, the keys are laid out like two rows of a piano, with the `z` and `a` rows forming the lower set of white and black keys respectively, and the `q` and number rows forming the higher octave set.
 This is a feature available in DAWs that support keyboard input, such as [LMMS](https://lmms.io), and is intended to be at least marginally familiar to pianists.
@@ -117,7 +117,7 @@ These notes are highlighted in white and gray respectively.
 #### Insert Mode
 
 - All letters and numbers: Insert a note of the corresponding pitch at the current cursor position. Refer to the labels on the left sidebar for this correspondence.
-- Escape/Backtick: Return to normal mode.
+- Escape: Return to normal mode.
 
 ## Contributing
 
