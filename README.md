@@ -24,7 +24,7 @@ To install the required Python dependencies, run:
 pip3 install -r requirements.txt
 ```
 
-For live playback, you will need a Soundfont in SF2 format.
+For live playback, you will need a soundfont in SF2 format.
 I recommend the MuseScore General Soundfont, which can be freely downloaded from the [MuseScore handbook](https://musescore.org/en/handbook/3/soundfonts-and-sfz-files) along with other soundfonts.
 
 ## Usage
@@ -38,7 +38,13 @@ Providing a MIDI file to open is optional.
 Providing an existing MIDI file will import it, while providing a nonexistent file will cause it to be created upon saving.
 You may also provide no file; if you choose to save later, it will be saved as `untitled.mid`.
 
+If you wish to import a MIDI file, but save changes to another file, use the `--import` or `-i` option:
+```sh
+./musicly.py file_to_export.mid -i file_to_import.mid -f soundfont.sf2
+```
+
 Providing a soundfont is also optional, but live playback will be unavailable unless you do.
+If no soundfont is provided, MusiCLI will look for one at `/usr/share/soundfonts/default.sf2`, which is FluidSynth's default location.
 
 Much more song-specific information can be customized via other command line arguments. View a full list by running:
 ```sh

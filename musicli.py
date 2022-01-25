@@ -89,6 +89,8 @@ DRUM_TRACK = 127  # Can't use 128 as MIDI only supports 127 tracks
 DRUM_BANK = 128
 DRUM_INSTRUMENT = 0
 DEFAULT_FILE = 'untitled.mid'
+DEFAULT_SOUNDFONT = '/usr/share/soundfonts/default.sf2'
+ESCDELAY = 25
 
 INSERT_KEYMAP = {
     'z': 0,   # C
@@ -505,7 +507,7 @@ def export_midi(notes, filename):
 def init_synth():
     synth = Synth()
     synth.start()
-    soundfont = synth.sfload(ARGS.soundfont.name)
+    soundfont = synth.sfload(ARGS.soundfont)
     # For live playback, each track uses the instrument of the same number
     for i in range(TOTAL_INSTRUMENTS):
         synth.program_select(i, soundfont, DEFAULT_CHANNEL, i)
@@ -637,7 +639,6 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
         if 0 <= start_x < width - 1:
             window.addstr(y, start_x, '▏' if ARGS.unicode else '[',
                           curses.color_pair(color_pair))
-
 
         note_width = end_x - start_x
         if note_width >= 4 and (0 <= start_x + 1 and
@@ -1157,13 +1158,21 @@ if __name__ == '__main__':
 
     # Globals
     ARGS = parser.parse_args()
-    SYNTH = init_synth() if ARGS.soundfont else None
 
     if ARGS.import_file:
         ARGS.import_file = ARGS.import_file.name
-    if ARGS.file and not ARGS.import_file:
+    elif ARGS.file:
         ARGS.import_file = ARGS.file
 
-    os.environ.setdefault('ESCDELAY', '25')
+    if ARGS.soundfont:
+        ARGS.soundfont = ARGS.soundfont.name
+    elif os.path.isfile(DEFAULT_SOUNDFONT):
+        with open(DEFAULT_SOUNDFONT, 'r') as default_soundfont:
+            if default_soundfont.readable():
+                ARGS.soundfont = DEFAULT_SOUNDFONT
+
+    SYNTH = init_synth() if ARGS.soundfont else None
+
+    os.environ.setdefault('ESCDELAY', str(ESCDELAY))
 
     curses.wrapper(wrapper)

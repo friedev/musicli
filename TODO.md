@@ -6,6 +6,7 @@
 - Focus on specific instrument (hide and mute others)
 - Display drum names on sidebar when editing drums
 - Separate drum window with a custom set of drums to use?
+- Color notes based on their category (piano, brass, etc.)
 - Inserting rests with / (?)
 - Set note velocity, preserve for subsequent notes
 - Select notes/chords under the cursor (keybind or automatic)
