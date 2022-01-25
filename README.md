@@ -6,7 +6,7 @@ MusiCLI 1.0 was developed in C++ by Aaron Friesen and David Ryan for [CornHacks 
 It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
 For those interested in the old version, it can be found at the tag `v1.0.0`.
 
-MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place in the main track!
+MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall!
 MusiCLI 2.0 presents a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [PyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
 
 ## Setup
@@ -98,25 +98,34 @@ These notes are highlighted in white and gray respectively.
 #### All Modes
 
 - Up/Down: Edit one octave above/below your current range.
-- Left/Right: Edit one step forward or backward in time. The number of beats you will travel is equal to the duration of the last note inserted.
-- `[`/`]`: Adjust the duration of the last note entered by one unit. Holding Shift will affect the last chord.
-- `,`/`.`: Adjust the beat of the last note entered by one unit. Holding Shift will affect the last chord.
-- Backspace/Delete: Delete the last note entered. Currently only works for the very last note, and none before it.
+- Left/Right: Edit one step forward or backward in time.
+  The number of beats you will travel is equal to the duration of the last note inserted.
+- `[`/`]`: Adjust the duration of the last note entered by one unit.
+  Holding Shift will affect the last chord.
+- `,`/`.`: Adjust the beat of the last note entered by one unit.
+  Holding Shift will affect the last chord.
+- Backspace/Delete: Delete the last note entered.
+  Currently only works for the very last note, and none before it.
 - Space: Play, pause, or resume music playback, if a soundfont was provided with `-f` or `--soundfont`.
-- Enter: Stop playback. Playback will resume from the start of the song.
+- Enter: Restart from the beginning of the song.
 - `Ctrl+C`: Exit MusiCLI.
 
 #### Normal Mode
 
 - `hjkl`: Pan the view. Holding Shift will cause you to pan in smaller steps.
-- `w`: Export the song as a MIDI file. **If you imported a file, it will be overwritten.** If you did not import a file but did specify a path, it will be saved to that path. If you did not specify a path, the file will be saved as `untitled.mid`.
+- `w`: Export the song as a MIDI file.
+  **If you opened an existing file (using the `file` parameter), it will be overwritten.**
+  Files imported with the `--import` argument will be unaffected.
+  If you did not import a file but did specify a path, it will be saved to that path.
+  If you did not specify a path, the file will be saved as `untitled.mid`.
 - `i`: Enter insert mode.
 - `a`: Enter insert mode and advance one step.
-- Escape/`\``: Deselect notes.
+- Escape: Deselect notes.
 
 #### Insert Mode
 
-- All letters and numbers: Insert a note of the corresponding pitch at the current cursor position. Refer to the labels on the left sidebar for this correspondence.
+- All letters and numbers: Insert a note of the corresponding pitch at the current cursor position.
+  Refer to the labels on the left sidebar for this correspondence.
 - Escape: Return to normal mode.
 
 ## Contributing
