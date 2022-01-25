@@ -785,8 +785,9 @@ def main(stdscr):
         cursor_x = time + (0 if last_note is None else duration) - x_offset
         draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
                   curses.color_pair(0),)
-        draw_line(stdscr, PLAYHEAD - x_offset, ' ',
-                  curses.color_pair(PAIR_PLAYHEAD))
+        if SYNTH is not None:
+            draw_line(stdscr, PLAYHEAD - x_offset, ' ',
+                      curses.color_pair(PAIR_PLAYHEAD))
         draw_notes(stdscr, SONG.notes, last_note, last_chord, x_offset,
                    y_offset)
         draw_sidebar(stdscr, octave, y_offset)
