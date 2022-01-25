@@ -437,14 +437,17 @@ def messages_to_notes(messages, instrument=None):
 
 def notes_to_tracks(notes):
     tracks = {}
-    last_times = {}
     for note in notes:
         if note.instrument not in tracks:
             tracks[note.instrument] = []
-            last_times[note.instrument] = 0
+        tracks[note.instrument].append(note)
+    return tracks
 
-        track = tracks[note.instrument]
-        last_time = last_times[note.instrument]
+
+def notes_to_messages(notes):
+    messages = []
+    last_time = 0
+    for note in notes:
         delta = note.time - last_time
         message_type = 'note_on' if note.on else 'note_off'
         message = Message(message_type,
@@ -452,10 +455,9 @@ def notes_to_tracks(notes):
                           velocity=note.velocity,
                           time=delta,
                           channel=note.channel)
-
-        track.append(message)
-        last_times[note.instrument] = note.time
-    return tracks
+        messages.append(message)
+        last_time = note.time
+    return messages
 
 
 def import_midi(infile_path):
@@ -488,11 +490,11 @@ def export_midi(notes, filename):
     outfile = MidiFile(ticks_per_beat=ARGS.ticks_per_beat)
 
     tracks = notes_to_tracks(notes)
-    for instrument, messages in tracks.items():
+    for instrument, track_notes in tracks.items():
         track = MidiTrack()
         track.append(Message('program_change', program=instrument,
-                             channel=messages[0].channel))
-        for message in messages:
+                             channel=track_notes[0].channel))
+        for message in notes_to_messages(track_notes):
             track.append(message)
         outfile.tracks.append(track)
 
