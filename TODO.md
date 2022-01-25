@@ -1,12 +1,12 @@
 # TODO
 
-- Inserting rests with / (?)
-- Import tempo from MIDI
-- Set note velocity, preserve for subsequent notes
+- Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
+- Select notes by instrument (useful for track exporting too)
 - Prompt/menu to select instrument
-- Preserve instruments when exporting
-- Toggle visibility of each instrument
-- Drums
+- Show/hide and mute/unmute each instrument
+- Note labels for drums
+- Inserting rests with / (?)
+- Set note velocity, preserve for subsequent notes
 - Select notes/chords under the cursor (keybind or automatic)
 - Measure select and delete/cut/copy/paste
 - Transposition
@@ -16,7 +16,6 @@
 - View details in normal mode
 - MIDI port I/O
 - Mouse support (if possible)
-- Argument(s) to remap instruments
 - Documentation
 - Screenshot(s)
 - Remove strict dependencies, allow partial functionality in their absence

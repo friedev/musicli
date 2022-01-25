@@ -35,6 +35,7 @@ COLOR_GRAY = 8
 
 # Color pair numbers
 INSTRUMENT_PAIRS = list(range(1, 8))
+PAIR_DRUM = len(INSTRUMENT_PAIRS)
 PAIR_SIDEBAR_NOTE = len(INSTRUMENT_PAIRS) + 1
 PAIR_SIDEBAR_KEY = len(INSTRUMENT_PAIRS) + 2
 PAIR_LINE = len(INSTRUMENT_PAIRS) + 3
@@ -78,7 +79,15 @@ SCALE_NAME_MAP = {
 TOTAL_NOTES = 127
 NOTES_PER_OCTAVE = 12
 MAX_VELOCITY = 127
+DEFAULT_VELOCITY = MAX_VELOCITY  # 64 is recommended, but seems quiet
 DEFAULT_OCTAVE = 4
+TOTAL_INSTRUMENTS = 127  # Drums replace gunshot as instrument 128
+DEFAULT_CHANNEL = 0
+DEFAULT_BANK = 0
+DRUM_CHANNEL = 9
+DRUM_TRACK = 127  # Can't use 128 as MIDI only supports 127 tracks
+DRUM_BANK = 128
+DRUM_INSTRUMENT = 0
 DEFAULT_FILE = 'untitled.mid'
 
 INSERT_KEYMAP = {
@@ -259,8 +268,9 @@ class Note:
                  number,
                  time,
                  duration=None,
-                 velocity=MAX_VELOCITY,
-                 instrument=0):
+                 velocity=DEFAULT_VELOCITY,
+                 instrument=None,
+                 channel=DEFAULT_CHANNEL):
         if time < 0:
             raise ValueError(f'Time must be non-negative; was {time}')
 
@@ -268,7 +278,9 @@ class Note:
         self.number = number
         self.time = time
         self.velocity = velocity
-        self.instrument = instrument
+        self.instrument = (ARGS.default_instrument if instrument is None else
+                           instrument)
+        self.channel = channel
 
         self.pair = None
         if duration is not None:
@@ -289,7 +301,8 @@ class Note:
                          self.number,
                          time,
                          velocity=self.velocity,
-                         instrument=self.instrument)
+                         instrument=self.instrument,
+                         channel=self.channel)
         self.pair.pair = self
 
     @property
@@ -320,6 +333,27 @@ class Note:
     @property
     def octave(self):
         return self.number // 12 - 1
+
+    @property
+    def is_drum(self):
+        return self.channel == DRUM_CHANNEL
+
+    @property
+    def track(self):
+        return DRUM_TRACK if self.is_drum else self.instrument
+
+    @property
+    def color_pair(self):
+        if self.is_drum:
+            return PAIR_DRUM
+        return INSTRUMENT_PAIRS[self.instrument %
+                                len(INSTRUMENT_PAIRS)]
+
+    def play(self, synth):
+        synth.noteon(self.track, self.number, self.velocity)
+
+    def stop(self, synth):
+        synth.noteoff(self.track, self.number)
 
     def move(self, time):
         if self.on:
@@ -360,24 +394,12 @@ class Note:
                 self.on == other.on and
                 self.number == other.number and
                 self.time == other.time and
-                self.instrument == other.instrument)
+                self.track == other.track)
 
 
-def notes_to_messages(notes):
-    messages = []
-    last_time = 0
-    for note in notes:
-        delta = note.time - last_time
-        message_type = 'note_on' if note.on else 'note_off'
-        messages.append(Message(message_type,
-                                note=note.number,
-                                velocity=note.velocity,
-                                time=delta))
-        last_time = note.time
-    return messages
-
-
-def messages_to_notes(messages, instrument=0):
+def messages_to_notes(messages, instrument=None):
+    if instrument is None:
+        instrument = ARGS.default_instrument
     notes = []
     active_notes = []
     time = 0
@@ -388,7 +410,8 @@ def messages_to_notes(messages, instrument=0):
                                      number=message.note,
                                      time=time,
                                      velocity=message.velocity,
-                                     instrument=instrument))
+                                     instrument=instrument,
+                                     channel=message.channel))
         elif message.type == 'note_off':
             for note in active_notes:
                 if note.number == message.note:
@@ -404,33 +427,71 @@ def messages_to_notes(messages, instrument=0):
     return sorted(notes)
 
 
+def notes_to_tracks(notes):
+    tracks = {}
+    last_times = {}
+    for note in notes:
+        if note.instrument not in tracks:
+            tracks[note.instrument] = []
+            last_times[note.instrument] = 0
+
+        track = tracks[note.instrument]
+        last_time = last_times[note.instrument]
+        delta = note.time - last_time
+        message_type = 'note_on' if note.on else 'note_off'
+        message = Message(message_type,
+                          note=note.number,
+                          velocity=note.velocity,
+                          time=delta,
+                          channel=note.channel)
+
+        track.append(message)
+        last_times[note.instrument] = note.time
+    return tracks
+
+
 def import_midi(infile_path):
     infile = MidiFile(infile_path)
     ARGS.ticks_per_beat = infile.ticks_per_beat
 
     notes = []
     set_tempo = False
-    for i, track in enumerate(infile.tracks):
-        notes += messages_to_notes(track, i)
+    for track in infile.tracks:
+        instrument = 0
+
+        # Use the first set_tempo message in any track as the song tempo
+        # Use the first program_change message in this track as its instrument
+        program_change = False
         for message in track:
             if not set_tempo and message.type == 'set_tempo':
                 ARGS.beats_per_minute = tempo2bpm(message.tempo)
                 set_tempo = True
+            elif not program_change and message.type == 'program_change':
+                instrument = message.program
+                program_change = True
+            if set_tempo and program_change:
+                break
+
+        notes += messages_to_notes(track, instrument)
     return sorted(notes)
 
 
 def export_midi(notes, filename):
     outfile = MidiFile(ticks_per_beat=ARGS.ticks_per_beat)
 
-    track = MidiTrack()
-    outfile.tracks.append(track)
+    tracks = notes_to_tracks(notes)
+    for instrument, messages in tracks.items():
+        track = MidiTrack()
+        track.append(Message('program_change', program=instrument,
+                             channel=messages[0].channel))
+        for message in messages:
+            track.append(message)
+        outfile.tracks.append(track)
 
-    track.append(Message('program_change', program=12))
-    track.append(MetaMessage('set_tempo',
-                             tempo=bpm2tempo(ARGS.beats_per_minute)))
-
-    for message in notes_to_messages(notes):
-        track.append(message)
+    tempo_track = MidiTrack()
+    tempo_track.append(MetaMessage('set_tempo',
+                                   tempo=bpm2tempo(ARGS.beats_per_minute)))
+    outfile.tracks.append(tempo_track)
 
     outfile.save(filename)
 
@@ -439,7 +500,10 @@ def init_synth():
     synth = Synth()
     synth.start()
     soundfont = synth.sfload(ARGS.soundfont.name)
-    synth.program_select(0, soundfont, 0, 0)
+    # For live playback, each track uses the instrument of the same number
+    for i in range(TOTAL_INSTRUMENTS):
+        synth.program_select(i, soundfont, DEFAULT_CHANNEL, i)
+    synth.program_select(DRUM_TRACK, soundfont, DRUM_BANK, DRUM_INSTRUMENT)
     return synth
 
 
@@ -485,9 +549,9 @@ def start_playback(synth):
 
             while note_index < len(SONG) and time == next_note.time:
                 if next_note.on:
-                    synth.noteon(0, next_note.number, next_note.velocity)
+                    next_note.play(synth)
                 else:
-                    synth.noteoff(0, next_note.number)
+                    next_note.stop(synth)
                 note_index += 1
                 if note_index < len(SONG):
                     next_note = SONG[note_index]
@@ -496,12 +560,12 @@ def start_playback(synth):
 def play_notes(synth, notes):
     for note in notes:
         if note.on:
-            synth.noteon(0, note.number, note.velocity)
+            note.play(synth)
 
 
 def stop_notes(synth, notes):
     for note in notes:
-        synth.noteoff(0, note.number)
+        note.stop(synth)
 
 
 def draw_scale_dots(window, key, scale, x_offset, y_offset):
@@ -559,8 +623,7 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
         elif note in last_chord:
             color_pair = PAIR_LAST_CHORD
         else:
-            color_pair = INSTRUMENT_PAIRS[note.instrument %
-                                          len(INSTRUMENT_PAIRS)]
+            color_pair = note.color_pair
 
         for x in range(max(0, start_x), min(width - 1, end_x)):
             window.addstr(y, x, ' ', curses.color_pair(color_pair))
@@ -568,6 +631,9 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
         if 0 <= start_x < width - 1:
             window.addstr(y, start_x, '▏' if ARGS.unicode else '[',
                           curses.color_pair(color_pair))
+
+        if note.is_drum:
+            continue
 
         note_width = end_x - start_x
         if note_width >= 4 and (0 <= start_x + 1 and
@@ -674,8 +740,8 @@ def main(stdscr):
     global SONG, MESSAGE
     SONG = Song()
 
-    if ARGS.file and os.path.exists(ARGS.file):
-        SONG.notes = import_midi(ARGS.file)
+    if ARGS.import_file and os.path.exists(ARGS.import_file):
+        SONG.notes = import_midi(ARGS.import_file)
 
     height, width = stdscr.getmaxyx()
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
@@ -812,7 +878,7 @@ def main(stdscr):
             # Export to MIDI
             elif input_char == 'w':
                 export_midi(SONG.notes, filename)
-                MESSAGE = f'Wrote MIDI to {filename}'
+                #MESSAGE = f'Wrote MIDI to {filename}'
 
             # Q doesn't quit
             # It'd be too easy to do on accident because it's C in insert mode
@@ -918,6 +984,7 @@ def main(stdscr):
                     last_note = None
                     last_chord = []
             else:
+                stop_notes(SYNTH, last_chord)
                 insert = False
 
         # Start/stop audio playback
@@ -951,10 +1018,12 @@ def wrapper(stdscr):
     for pair in INSTRUMENT_PAIRS:
         curses.init_pair(pair, curses.COLOR_BLACK, pair)
     try:
+        curses.init_pair(PAIR_DRUM, curses.COLOR_BLACK, COLOR_GRAY)
         curses.init_pair(PAIR_SIDEBAR_NOTE, COLOR_GRAY, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
         curses.init_pair(PAIR_LAST_CHORD, curses.COLOR_BLACK, COLOR_GRAY)
     except ValueError:
+        curses.init_pair(PAIR_DRUM, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(PAIR_SIDEBAR_NOTE,
                          curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(PAIR_LINE, curses.COLOR_WHITE, -1)
@@ -990,6 +1059,14 @@ def positive_int(value):
     return int_value
 
 
+def short_int(value):
+    int_value = int(value)
+    if not 0 <= int_value < 128:
+        raise ArgumentTypeError('must be an integer from 0-127; was '
+                                f'{int_value}')
+    return int_value
+
+
 def optional_file(value):
     if os.path.isdir(value):
         raise ArgumentTypeError(f'file cannot be a directory; was {value}')
@@ -1009,6 +1086,12 @@ if __name__ == '__main__':
             type=optional_file,
             nargs='?',
             help='MIDI file to read input from and write output to')
+    parser.add_argument(
+            '-i', '--import',
+            dest='import_file',
+            type=FileType('r'),
+            help='MIDI file to import from; overrides the file argument for '
+                 'importing')
     parser.add_argument(
             '-f', '--soundfont',
             type=FileType('r'),
@@ -1045,6 +1128,18 @@ if __name__ == '__main__':
             default='major',
             help='the scale of the song to display in MusiCLI')
     parser.add_argument(
+            '--default-velocity',
+            type=short_int,
+            default=MAX_VELOCITY,
+            help='the default velocity to use for new notes')
+    parser.add_argument(
+            '--default-instrument',
+            type=short_int,
+            default=0,
+            help='the default instrument to use for playback if no other '
+                 'instrument is specified; given as a 0-indexed MIDI'
+                 'instrument number')
+    parser.add_argument(
             '-u', '--unicode',
             dest='unicode',
             action='store_true',
@@ -1060,9 +1155,10 @@ if __name__ == '__main__':
     ARGS = parser.parse_args()
     SYNTH = init_synth() if ARGS.soundfont else None
 
-    if ARGS.beats_per_minute <= 0:
-        raise ArgumentTypeError('Beats per minute must be positive; was '
-                                f'{ARGS.beats_per_minute}')
+    if ARGS.import_file:
+        ARGS.import_file = ARGS.import_file.name
+    if ARGS.file and not ARGS.import_file:
+        ARGS.import_file = ARGS.file
 
     os.environ.setdefault('ESCDELAY', '25')
 
