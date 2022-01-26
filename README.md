@@ -9,6 +9,8 @@ For those interested in the old version, it can be found at the tag `v1.0.0`.
 MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall!
 MusiCLI 2.0 presents a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [PyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
 
+![Screenshot](screenshot.png)
+
 ## Setup
 
 - Python 3

@@ -12,6 +12,7 @@
 	- Stack of previous notes for backspacing, or automatic selection
 	- Keybind to sync playhead to cursor and vice versa
 	- View details in normal mode
+	- Horizontal zoom: change units per beat in-editor
 - Instruments
 	- Prompt/menu to select instrument
 	- Focus on specific instrument (hide and mute others)
