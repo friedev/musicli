@@ -19,6 +19,7 @@ from argparse import ArgumentParser, ArgumentTypeError, FileType
 from bisect import bisect_left, bisect_right, insort
 import curses
 import curses.ascii
+from math import inf
 import os
 import os.path
 import sys
@@ -429,23 +430,33 @@ class Song:
     def notes_by_track(self):
         return notes_by_track(self.notes)
 
-    def add_note(self, note, pair=True):
-        if note in self:
-            raise ValueError('Note {note} is already in this song')
+    @property
+    def start(self):
+        return self[0].start
 
-        insort(self.notes, note)
+    @property
+    def end(self):
+        return self[-1].end
+
+    def add_note(self, note, pair=True):
+        index = bisect_left(self.notes, note)
+        if self[index] == note and (not pair or self[index].pair == note.pair):
+            raise ValueError('Note {note} is already in the song')
+        self.notes.insert(index, note)
         if pair:
             if note.pair is None:
                 raise ValueError('Note {note} is unpaired')
-            if note.pair in self:
-                raise ValueError('Note {note.pair} is already in this song')
             insort(self.notes, note.pair)
 
-    def remove_note(self, note, pair=True):
+    def remove_note(self, note, pair=True, lookup=False):
+        # Get the song note rather than the given note, since externally
+        # created notes may have different pairs
+        if lookup:
+            note = self[self.notes.index(note)]
         self.notes.remove(note)
         if pair:
             if note.pair is None:
-                raise ValueError('Note {note} is unpaired')
+                raise ValueError('Note {song_note} is unpaired')
             self.notes.remove(note.pair)
 
     def move_note(self, note, time):
@@ -458,26 +469,54 @@ class Song:
         note.set_duration(duration)
         self.add_note(note)
 
-    def get_index(self, time, track=None):
+    def get_index(self, time, track=None, on=False):
         index = bisect_left(self, DummyNote(time))
         if time < self[index].time:
             return -1
         if time > self[index].time:
             return len(self)
-        if track is None:
-            return index
         while (index < len(self) and
                self[index].time == time and
-               self[index].track is not track):
+               ((track is not None and self[index].track is not track) or
+                (on and not self[index].on))):
             index += 1
         return index
 
-    def get_note(self, time, track=None):
-        index = self.get_index(time, track)
+    def get_previous_index(self, time, track=None, on=False):
+        index = bisect_left(self, DummyNote(time))
+        if time < self[index].time:
+            return -1
+        index -= 1
+        while (index >= 0 and
+               ((track is not None and self[index].track is not track) or
+                (on and not self[index].on))):
+            index -= 1
+        return index
+
+    def get_next_index(self, time, track=None, on=False):
+        index = bisect_right(self, DummyNote(time))
+        if time > self[index].time:
+            return len(self)
+        while (index < len(self) and
+               ((track is not None and self[index].track is not track) or
+                (on and not self[index].on))):
+            index += 1
+        return index
+
+    def get_note(self, time, track=None, on=False):
+        index = self.get_index(time, track, on)
         return self[index] if 0 <= index < len(self) else None
 
+    def get_previous_note(self, time, track=None, on=False):
+        index = self.get_previous_index(time, track, on)
+        return self[index] if index >= 0 else None
+
+    def get_next_note(self, time, track=None, on=False):
+        index = self.get_next_index(time, track, on)
+        return self[index] if index < len(self) else None
+
     def get_chord(self, time, track=None):
-        index = self.get_index(time, track)
+        index = self.get_index(time, track, on=True)
         if not 0 <= index < len(self):
             return []
         chord_time = self[index].time
@@ -485,61 +524,36 @@ class Song:
         index += 1
         while (index < len(self) and
                self[index].time == chord_time):
-            if track is None or self[index].track is track:
+            if (self[index].on and
+                    (track is None or self[index].track is track)):
                 chord.append(self[index])
             index += 1
         return chord
 
-    def get_previous_index(self, time, track=None):
-        index = bisect_left(self, DummyNote(time))
-        if time < self[index].time:
-            return -1
-        if track is None:
-            return max(index - 1, 0)
-        while index >= 0 and self[index].track is not track:
-            index -= 1
-        return index
-
-    def get_next_index(self, time, track=None):
-        index = bisect_right(self, DummyNote(time))
-        if time > self[index].time:
-            return len(self)
-        if track is None:
-            return index
-        while index < len(self) and self[index].track is not track:
-            index += 1
-        return index
-
-    def get_previous_note(self, time, track=None):
-        index = self.get_previous_index(time, track)
-        return self[index] if index >= 0 else None
-
-    def get_next_note(self, time, track=None):
-        index = self.get_next_index(time, track)
-        return self[index] if index < len(self) else None
-
     def get_previous_chord(self, time, track=None):
-        index = self.get_previous_index(time, track)
+        index = self.get_previous_index(time, track, on=True)
         if index < 0:
             return []
         chord_time = self[index].time
         chord = [self[index]]
         index -= 1
         while index >= 0 and self[index].time == chord_time:
-            if track is None or self[index].track is track:
+            if (self[index].on and
+                    (track is None or self[index].track is track)):
                 chord.append(self[index])
             index -= 1
         return chord
 
     def get_next_chord(self, time, track=None):
-        index = self.get_next_index(time, track)
+        index = self.get_next_index(time, track, on=True)
         if index >= len(self):
             return []
         chord_time = self[index].time
         chord = [self[index]]
         index += 1
         while index < len(self) and self[index].time == chord_time:
-            if track is None or self[index].track is track:
+            if (self[index].on and
+                    (track is None or self[index].track is track)):
                 chord.append(self[index])
             index += 1
         return chord
@@ -761,6 +775,10 @@ class Note:
     def __str__(self):
         return f'{self.full_name} ({self.instrument_name} @ {self.velocity})'
 
+    def __repr__(self):
+        # TODO make a better __repr__
+        return str(self)
+
     def __lt__(self, other):
         return self.time < other.time
 
@@ -922,13 +940,15 @@ def start_playback(synth):
 
 
 def play_notes(synth, notes):
-    for note in notes:
-        note.play(synth)
+    if synth is not None:
+        for note in notes:
+            note.play(synth)
 
 
 def stop_notes(synth, notes):
-    for note in notes:
-        note.stop(synth)
+    if synth is not None:
+        for note in notes:
+            note.stop(synth)
 
 
 def draw_scale_dots(window, key, scale, x_offset, y_offset):
@@ -980,9 +1000,9 @@ def draw_notes(window, song, last_note, last_chord, x_offset, y_offset):
         if not 0 < y < height:
             continue
 
-        if note is last_note or note.pair is last_note:
+        if note.on_pair is last_note:
             color_pair = PAIR_LAST_NOTE
-        elif note in last_chord:
+        elif note.on_pair in last_chord:
             color_pair = PAIR_LAST_CHORD
         else:
             color_pair = note.color_pair
@@ -1099,17 +1119,35 @@ def snap_to_time(stdscr,
                  min_x_offset,
                  x_sidebar_offset,
                  center=True):
-    height, width = stdscr.getmaxyx()
+    _, width = stdscr.getmaxyx()
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
     time_units = ticks_to_units(time)
     if time_units < x_offset or time_units >= x_offset + width:
-        new_offset = time
+        new_offset = time_units
         if center:
             new_offset -= width // 2
         x_offset = max(new_offset -
                        new_offset % units_per_measure +
                        x_sidebar_offset,
                        min_x_offset)
+    return x_offset
+
+
+def format_velocity(velocity):
+    return f'Velocity: {velocity}'
+
+
+def format_track(index, track):
+    return f'Track {index + 1}: {track.instrument_name}'
+
+
+def format_notes(notes):
+    if len(notes) == 1:
+        return str(notes[0])
+    string = ''
+    for note in sorted(notes, key=lambda x: x.number):
+        string += note.full_name + ' '
+    return string
 
 
 def main(stdscr):
@@ -1126,7 +1164,7 @@ def main(stdscr):
         SONG.tracks.append(new_track)
         new_track.set_instrument(ARGS.default_instrument, SYNTH)
 
-    height, width = stdscr.getmaxyx()
+    height, _ = stdscr.getmaxyx()
     x_sidebar_offset = -6
     min_x_offset = x_sidebar_offset
     min_y_offset = 0
@@ -1139,7 +1177,7 @@ def main(stdscr):
     scale = SCALE_NAME_MAP[ARGS.scale]
 
     time = 0
-    duration = ARGS.units_per_beat
+    duration = beats_to_ticks(1)
     velocity = DEFAULT_VELOCITY
     track_index = 0
     track = SONG.tracks[track_index]
@@ -1153,20 +1191,21 @@ def main(stdscr):
 
     # Loop until user the exits
     while True:
-        height, width = stdscr.getmaxyx()
+        height, _ = stdscr.getmaxyx()
         if not insert and play_playback.is_set():
-            snap_to_time(stdscr,
-                         units_to_ticks(PLAYHEAD),
-                         x_offset,
-                         min_x_offset,
-                         x_sidebar_offset)
+            x_offset = snap_to_time(stdscr,
+                                    units_to_ticks(PLAYHEAD),
+                                    x_offset,
+                                    min_x_offset,
+                                    x_sidebar_offset,
+                                    center=False)
 
         draw_scale_dots(stdscr, key, scale, x_offset, y_offset)
         draw_measures(stdscr, x_offset)
-        cursor_x = (ticks_to_units(time) +
-                    (0 if last_note is None else duration) -
-                    x_offset)
-        draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
+        cursor_x = ticks_to_units(time) - x_offset
+        draw_line(stdscr,
+                  cursor_x,
+                  '▏' if ARGS.unicode else '|',
                   curses.color_pair(0))
         if SYNTH is not None:
             draw_line(stdscr,
@@ -1200,35 +1239,42 @@ def main(stdscr):
 
         if curses.ascii.isprint(input_code):
             input_char = chr(input_code)
+            if input_char.isalpha():
+                input_lower = input_char.lower()
+            else:
+                input_lower = input_char
         else:
             input_char = ''
+            input_lower = ''
 
         if insert:
             number = INSERT_KEYMAP.get(input_char.lower())
             if number is not None:
-                if SYNTH is not None and not play_playback.is_set():
+                if not play_playback.is_set():
                     stop_notes(SYNTH, last_chord)
 
-                if last_note is not None and not input_char.isupper():
+                if (last_note is not None and
+                        not (input_char.isupper() or
+                             not input_char.isalnum())):
                     time += duration
                     if insert:
-                        snap_to_time(stdscr,
-                                     time,
-                                     x_offset,
-                                     min_x_offset,
-                                     x_sidebar_offset)
+                        x_offset = snap_to_time(stdscr,
+                                                time,
+                                                x_offset,
+                                                min_x_offset,
+                                                x_sidebar_offset)
                     last_chord = []
 
                 number += octave * NOTES_PER_OCTAVE
                 note = Note(on=True,
                             number=number,
                             time=time,
-                            duration=units_to_ticks(duration),
+                            duration=duration,
                             velocity=velocity,
                             track=track)
 
-                if note in SONG.notes:
-                    SONG.remove_note(note)
+                if note in SONG:
+                    SONG.remove_note(note, lookup=True)
                     if note == last_note:
                         last_note = None
                     if note in last_chord:
@@ -1238,26 +1284,21 @@ def main(stdscr):
                     last_note = note
                     last_chord.append(note)
 
-                if len(last_chord) == 1:
-                    MESSAGE = str(last_note)
-                else:
-                    MESSAGE = ''
-                    for note in sorted(last_chord, key=lambda x: x.number):
-                        MESSAGE += note.full_name + ' '
+                MESSAGE = format_notes(last_chord)
 
-                if SYNTH is not None and not play_playback.is_set():
+                if not play_playback.is_set():
                     play_notes(SYNTH, last_chord)
                 continue
         else:
             # Pan view
-            if input_char.lower() in tuple('hl'):
+            if input_lower in tuple('hl'):
                 delta = (ARGS.units_per_beat if input_char.isupper() else
                          ARGS.units_per_beat * ARGS.beats_per_measure)
                 if input_char.lower() == 'h':
                     x_offset = max(x_offset - delta, min_x_offset)
                 else:
                     x_offset += delta
-            if input_char.lower() in tuple('kj'):
+            if input_lower in tuple('kj'):
                 delta = 1 if input_char.isupper() else NOTES_PER_OCTAVE
                 if input_char.lower() == 'j':
                     y_offset = max(y_offset - delta, min_y_offset)
@@ -1266,42 +1307,71 @@ def main(stdscr):
 
             # Enter insert mode
             elif input_char in tuple('ia'):
+                # TODO add capital I/A to jump to start/end
                 insert = True
 
                 if input_char == 'a':
                     time += duration
 
-                snap_to_time(stdscr,
-                             time,
-                             x_offset,
-                             min_x_offset,
-                             x_sidebar_offset)
+                x_offset = snap_to_time(stdscr,
+                                        time,
+                                        x_offset,
+                                        min_x_offset,
+                                        x_sidebar_offset)
 
             # Export to MIDI
-            elif input_char == 'w':
+            elif input_lower == 'w':
                 export_midi(SONG, filename)
                 MESSAGE = f'Wrote MIDI to {filename}'
 
             # Q doesn't quit
             # It'd be too easy to do on accident because it's C in insert mode
             # Instead, show a message saying how to exit
-            elif input_char == 'q':
+            elif input_lower == 'q':
                 MESSAGE = 'Press Ctrl+C to exit MusiCLI'
 
         # Move the editing cursor and octave
         if input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
             if input_code == curses.KEY_LEFT:
-                nearest_note = SONG.get_previous_note(time)
-                nearest_time = nearest_note.time
-                time = max(time - duration, 0)
-            elif input_code == curses.KEY_RIGHT:
-                time += duration
+                nearest_chord = SONG.get_previous_chord(time, track)
+                if len(nearest_chord) > 0:
+                    nearest_time = nearest_chord[0].start
+                    end_time = max([note.end for note in nearest_chord])
+                else:
+                    nearest_time = 0
+                    end_time = 0
+                if last_note is not None and end_time >= last_note.start:
+                    time = nearest_time
+                else:
+                    time = max(time - duration, nearest_time, 0)
 
-            snap_to_time(stdscr,
-                         time,
-                         x_offset,
-                         min_x_offset,
-                         x_sidebar_offset)
+            elif input_code == curses.KEY_RIGHT:
+                chord_time = time
+                if last_note is None:
+                    chord_time = time - 1
+                nearest_chord = SONG.get_next_chord(chord_time, track)
+                if len(nearest_chord) > 0:
+                    nearest_time = nearest_chord[0].start
+                else:
+                    nearest_time = inf
+
+                if last_note is not None and nearest_time <= last_note.end:
+                    time = nearest_time
+                else:
+                    time = min(time + duration, nearest_time)
+
+            if len(nearest_chord) > 0 and time == nearest_time:
+                last_chord = nearest_chord
+                last_note = nearest_chord[0]
+                duration = last_note.duration
+
+            x_offset = snap_to_time(stdscr,
+                                    time,
+                                    x_offset,
+                                    min_x_offset,
+                                    x_sidebar_offset)
+
+            MESSAGE = format_notes(last_chord)
         elif input_code == curses.KEY_UP:
             octave = min(octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1)
             y_offset = min(((octave + 1) * NOTES_PER_OCTAVE) - height // 2,
@@ -1328,20 +1398,19 @@ def main(stdscr):
                         SONG.set_duration(note, max(note.duration -
                                                     units_to_ticks(1),
                                                     units_to_ticks(1)))
-                    duration = max(1, duration - 1)
                 elif input_char == '}':
                     for note in last_chord:
                         SONG.set_duration(note,
                                           note.duration + units_to_ticks(1))
-                    duration += 1
 
                 # Update duration and time for next insertion
-                duration = ticks_to_units(last_note.duration)
+                duration = last_note.duration
             else:
                 if input_char in tuple('[{'):
-                    duration = max(duration - 1, 1)
+                    duration = max(duration - units_to_ticks(1),
+                                   units_to_ticks(1))
                 else:
-                    duration += 1
+                    duration += units_to_ticks(1)
 
         elif input_char in tuple(',.<>'):
             if last_note is not None:
@@ -1349,28 +1418,27 @@ def main(stdscr):
                 if input_char in tuple(',.'):
                     if input_char == ',':
                         new_start = max(last_note.start - units_to_ticks(1), 0)
-                        time = max(0, time - 1)
                     else:
                         new_start = last_note.start + units_to_ticks(1)
-                        time += 1
                     SONG.move_note(last_note, new_start)
+                    time = last_note.start
+                    last_chord = [last_note]
 
                 # Shift last chord
                 else:
+                    if input_char == '<':
+                        new_start = max(last_note.start - units_to_ticks(1), 0)
+                    else:
+                        new_start = last_note.start + units_to_ticks(1)
                     for note in last_chord:
-                        if input_char == '<':
-                            note.start = max(note.start - units_to_ticks(1), 0)
-                            time = max(0, time - 1)
-                        else:
-                            note.start += units_to_ticks(1)
-                            time += 1
                         SONG.move_note(note, new_start)
+                    time = last_note.end
 
-                snap_to_time(stdscr,
-                             time,
-                             x_offset,
-                             min_x_offset,
-                             x_sidebar_offset)
+                x_offset = snap_to_time(stdscr,
+                                        time,
+                                        x_offset,
+                                        min_x_offset,
+                                        x_sidebar_offset)
         # Change velocity
         elif input_char in tuple(';:\'"'):
             if input_char in tuple(';:'):
@@ -1378,7 +1446,7 @@ def main(stdscr):
             else:
                 velocity = min(velocity + 1, MAX_VELOCITY)
 
-            MESSAGE = f'Velocity: {velocity}'
+            MESSAGE = format_velocity(velocity)
 
             if input_char in tuple(';\''):
                 if last_note is not None:
@@ -1396,7 +1464,7 @@ def main(stdscr):
             track_index %= len(SONG.tracks)
             track = SONG.tracks[track_index]
 
-            MESSAGE = f'Track {track_index + 1}: {track.instrument_name}'
+            MESSAGE = format_track(track_index, track)
 
         # Change instrument
         elif input_char in tuple('_+'):
@@ -1412,7 +1480,7 @@ def main(stdscr):
 
             track.set_instrument(instrument, SYNTH)
 
-            MESSAGE = f'Track {track_index + 1}: {track.instrument_name}'
+            MESSAGE = format_track(track_index, track)
 
             for note in last_chord:
                 play_notes(SYNTH, last_chord)
@@ -1420,16 +1488,24 @@ def main(stdscr):
         # Delete last note
         elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
             if last_note is not None:
-                last_note.stop(SYNTH)
+                stop_notes(SYNTH, [last_note])
                 if input_code == curses.KEY_DC:
-                    time += ticks_to_units(last_note.duration)
+                    time += last_note.duration
+                last_duration = last_note.duration
                 SONG.remove_note(last_note)
                 last_chord.remove(last_note)
                 last_note = None
                 if input_code == curses.KEY_BACKSPACE:
-                    last_chord = SONG.get_previous_chord(time)
-                    last_note = last_chord[0]
-                    time = last_note.time
+                    last_chord = SONG.get_previous_chord(time, track)
+                    if len(last_chord) > 0:
+                        last_note = last_chord[0]
+                        time = last_note.time
+                    else:
+                        time -= last_duration
+            elif input_code == curses.KEY_BACKSPACE:
+                # TODO move to the previous chord like KEY_LEFT
+                # Consider deleting the entire chord with backspace
+                time = max(time - duration, 0)
 
         # Leave insert mode or deselect notes
         elif input_code == curses.ascii.ESC:
