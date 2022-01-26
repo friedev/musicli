@@ -24,6 +24,7 @@ import os.path
 import sys
 from threading import Event, Thread
 from time import sleep
+from traceback import format_exc
 
 from fluidsynth import Synth
 from mido import (bpm2tempo, Message, MetaMessage, MidiFile, MidiTrack,
@@ -88,8 +89,10 @@ DRUM_CHANNEL = 9
 DRUM_TRACK = 127  # Can't use 128 as MIDI only supports 127 tracks
 DRUM_BANK = 128
 DRUM_INSTRUMENT = 0
+DRUM_OFFSET = 35
 DEFAULT_FILE = 'untitled.mid'
 DEFAULT_SOUNDFONT = '/usr/share/soundfonts/default.sf2'
+CRASH_FILE = 'crash.log'
 ESCDELAY = 25
 
 INSERT_KEYMAP = {
@@ -145,6 +148,192 @@ NAME_TO_NUMBER = {
     'Bb': 10,
     'B':  11,
 }
+
+# Adapted from:
+# https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
+INSTRUMENT_NAMES = [
+    'Grand Piano',
+    'Bright Grand Piano',
+    'Electric Grand Piano',
+    'Honky-tonk Piano',
+    'Electric Piano 1',
+    'Electric Piano 2',
+    'Harpsichord',
+    'Clavinet',
+    'Celesta',
+    'Glockenspiel',
+    'Music Box',
+    'Vibraphone',
+    'Marimba',
+    'Xylophone',
+    'Tubular Bells',
+    'Dulcimer',
+    'Drawbar Organ',
+    'Percussive Organ',
+    'Rock Organ',
+    'Church Organ',
+    'Reed Organ',
+    'Accordion',
+    'Harmonica',
+    'Tango Accordion',
+    'Nylon Guitar',
+    'Steel Guitar',
+    'Jazz Guitar',
+    'Clean Guitar',
+    'Muted Guitar',
+    'Overdrive Guitar',
+    'Distortion Guitar',
+    'Guitar Harmonics',
+    'Acoustic Bass',
+    'Finger Bass',
+    'Pick Bass',
+    'Fretless Bass',
+    'Slap Bass 1',
+    'Slap Bass 2',
+    'Synth Bass 1',
+    'Synth Bass 2',
+    'Violin',
+    'Viola',
+    'Cello',
+    'Contrabass',
+    'Tremolo Strings',
+    'Pizzicato Strings',
+    'Orchestral Harp',
+    'Timpani',
+    'String Ensemble 1',
+    'String Ensemble 2',
+    'Synth Strings 1',
+    'Synth Strings 2',
+    'Choir Aahs',
+    'Voice Oohs',
+    'Synth Voice',
+    'Orchestra Hit',
+    'Trumpet',
+    'Trombone',
+    'Tuba',
+    'Muted Trumpet',
+    'French Horn',
+    'Brass Section',
+    'Synth Brass 1',
+    'Synth Brass 2',
+    'Soprano Sax',
+    'Alto Sax',
+    'Tenor Sax',
+    'Baritone Sax',
+    'Oboe',
+    'English Horn',
+    'Bassoon',
+    'Clarinet',
+    'Piccolo',
+    'Flute',
+    'Recorder',
+    'Pan Flute',
+    'Blown bottle',
+    'Shakuhachi',
+    'Whistle',
+    'Ocarina',
+    'Square Lead',
+    'Sawtooth Lead',
+    'Calliope Lead',
+    'Chiff Lead',
+    'Charang Lead',
+    'Space Voice Lead',
+    'Fifths Lead',
+    'Bass and Lead',
+    'Fantasia Pad',
+    'Warm Pad',
+    'Polysynth Pad',
+    'Choir Pad',
+    'Bowed Pad',
+    'Metallic Pad',
+    'Halo Pad',
+    'Sweep Pad',
+    'Rain FX',
+    'Soundtrack FX',
+    'Crystal FX',
+    'Atmosphere FX',
+    'Brightness FX',
+    'Goblins FX',
+    'Echoes FX',
+    'Sci-Fi FX',
+    'Sitar',
+    'Banjo',
+    'Shamisen',
+    'Koto',
+    'Kalimba',
+    'Bag pipe',
+    'Fiddle',
+    'Shanai',
+    'Tinkle Bell',
+    'Agogô',
+    'Steel Drums',
+    'Woodblock',
+    'Taiko Drum',
+    'Melodic Tom',
+    'Synth Drum',
+    'Reverse Cymbal',
+    'Guitar Fret Noise',
+    'Breath Noise',
+    'Seashore',
+    'Bird Tweet',
+    'Telephone Ring',
+    'Helicopter',
+    'Applause',
+    'Gunshot',
+]
+
+# Adapted from:
+# https://en.wikipedia.org/wiki/General_MIDI#Percussion
+# Offset by DRUM_OFFSET
+DRUM_NAMES = [
+    'Acoustic Bass Drum',
+    'Electric Bass Drum',
+    'Side Stick',
+    'Acoustic Snare',
+    'Hand Clap',
+    'Electric Snare',
+    'Low Floor Tom',
+    'Closed Hi-hat',
+    'High Floor Tom',
+    'Pedal Hi-hat',
+    'Low Tom',
+    'Open Hi-hat',
+    'Low-Mid Tom',
+    'Hi-Mid Tom',
+    'Crash Cymbal 1',
+    'High Tom',
+    'Ride Cymbal 1',
+    'Chinese Cymbal',
+    'Ride Bell',
+    'Tambourine',
+    'Splash Cymbal',
+    'Cowbell',
+    'Crash Cymbal 2',
+    'Vibraslap',
+    'Ride Cymbal 2',
+    'High Bongo',
+    'Low Bongo',
+    'Mute High Conga',
+    'Open High Conga',
+    'Low Conga',
+    'High Timbale',
+    'Low Timbale',
+    'High Agogô',
+    'Low Agogô',
+    'Cabasa',
+    'Maracas',
+    'Short Whistle',
+    'Long Whistle',
+    'Short Guiro',
+    'Long Guiro',
+    'Claves',
+    'High Woodblock',
+    'Low Woodblock',
+    'Mute Cuica',
+    'Open Cuica',
+    'Mute Triangle',
+    'Open Triangle',
+]
 
 play_playback = Event()
 restart_playback = Event()
@@ -301,9 +490,9 @@ class Note:
             raise ValueError('Note must end strictly after it starts; '
                              f'times were {self.time} and {time}')
 
-        self.pair = Note(not self.on,
-                         self.number,
-                         time,
+        self.pair = Note(on=not self.on,
+                         number=self.number,
+                         time=time,
                          velocity=self.velocity,
                          instrument=self.instrument,
                          channel=self.channel)
@@ -329,18 +518,26 @@ class Note:
 
     @property
     def name(self):
-        if self.is_drum:
-            return str(self.number)
-        return number_to_name(self.number, octave=False)
+        return self.name_in_key(None, octave=False)
 
-    def name_in_key(self, key):
+    @property
+    def full_name(self):
+        return self.name_in_key(None, octave=True)
+
+    def name_in_key(self, key, octave=False):
         if self.is_drum:
             return str(self.number)
-        return number_to_name(self.number, key, octave=False)
+        return number_to_name(self.number, key, octave=octave)
 
     @property
     def octave(self):
         return self.number // 12 - 1
+
+    @property
+    def instrument_name(self):
+        if self.is_drum:
+            return DRUM_NAMES[self.number - DRUM_OFFSET]
+        return INSTRUMENT_NAMES[self.instrument]
 
     @property
     def is_drum(self):
@@ -388,8 +585,26 @@ class Note:
             else:
                 self.time = self.pair.time + duration
 
+    def set_velocity(self, velocity):
+        if not 0 <= velocity < MAX_VELOCITY:
+            raise ValueError('Velocity must be in the range '
+                             f'0-{MAX_VELOCITY}; was {velocity}')
+
+        self.velocity = velocity
+        if self.pair is not None:
+            self.pair.velocity = velocity
+
+    def set_instrument(self, instrument):
+        if not 0 <= instrument < TOTAL_INSTRUMENTS:
+            raise ValueError('Instrument must be in the range '
+                             f'0-{TOTAL_INSTRUMENTS}; was {instrument}')
+
+        self.instrument = instrument
+        if self.pair is not None:
+            self.pair.instrument = instrument
+
     def __str__(self):
-        return self.name + str(self.octave)
+        return f'{self.full_name} ({self.instrument_name} @ {self.velocity})'
 
     def __lt__(self, other):
         return self.time < other.time
@@ -414,7 +629,7 @@ def messages_to_notes(messages, instrument=None):
     for message in messages:
         time += message.time
         if message.type == 'note_on':
-            active_notes.append(Note(True,
+            active_notes.append(Note(on=True,
                                      number=message.note,
                                      time=time,
                                      velocity=message.velocity,
@@ -652,11 +867,11 @@ def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
 def draw_sidebar(window, octave, y_offset):
     height, _ = window.getmaxyx()
     for y, number in enumerate(range(y_offset, y_offset + height)):
-        note = number_to_name(number)
+        note_name = number_to_name(number)
         insert_key = number - octave * NOTES_PER_OCTAVE
         window.addstr(height - y - 1,
                       0,
-                      str(note).ljust(4).rjust(6),
+                      note_name.ljust(4).rjust(6),
                       curses.color_pair(PAIR_SIDEBAR_NOTE))
         if 0 <= insert_key < len(INSERT_KEYLIST):
             window.addstr(height - y - 1,
@@ -765,6 +980,8 @@ def main(stdscr):
     scale = SCALE_NAME_MAP[ARGS.scale]
     time = 0
     duration = ARGS.units_per_beat
+    velocity = DEFAULT_VELOCITY
+    instrument = 0
     last_note = None
     last_chord = []
     filename = ARGS.file if ARGS.file else DEFAULT_FILE
@@ -834,10 +1051,12 @@ def main(stdscr):
                     last_chord = []
 
                 number += octave * NOTES_PER_OCTAVE
-                note = Note(True,
-                            number,
-                            units_to_ticks(time),
-                            units_to_ticks(duration))
+                note = Note(on=True,
+                            number=number,
+                            time=units_to_ticks(time),
+                            duration=units_to_ticks(duration),
+                            velocity=velocity,
+                            instrument=instrument)
 
                 if note in SONG.notes:
                     SONG.remove(note)
@@ -849,6 +1068,13 @@ def main(stdscr):
                     SONG.add(note)
                     last_note = note
                     last_chord.append(note)
+
+                if len(last_chord) == 1:
+                    MESSAGE = str(last_note)
+                else:
+                    MESSAGE = ''
+                    for note in sorted(last_chord, key=lambda x: x.number):
+                        MESSAGE += note.full_name + ' '
 
                 if SYNTH is not None and not play_playback.is_set():
                     play_notes(SYNTH, last_chord)
@@ -916,34 +1142,29 @@ def main(stdscr):
                            min_y_offset)
 
         elif input_char in tuple('[]{}'):
-            # Change duration of last note
-            if input_char == '[':
-                if last_note is not None:
+            if last_note is not None:
+                # Change duration of last note
+                if input_char == '[':
                     last_note.set_duration(max(last_note.duration -
                                                units_to_ticks(1),
                                                units_to_ticks(1)))
-                else:
-                    duration = max(1, duration - 1)
-            elif input_char == ']':
-                if last_note is not None:
+                elif input_char == ']':
                     last_note.set_duration(last_note.duration +
                                            units_to_ticks(1))
-                else:
+
+                # Change duration of last chord
+                elif input_char == '{':
+                    for note in last_chord:
+                        note.set_duration(max(note.duration -
+                                              units_to_ticks(1),
+                                              units_to_ticks(1)))
+                    duration = max(1, duration - 1)
+                elif input_char == '}':
+                    for note in last_chord:
+                        note.set_duration(note.duration + units_to_ticks(1))
                     duration += 1
 
-            # Change duration of last chord
-            elif input_char == '{':
-                for note in last_chord:
-                    note.set_duration(max(note.duration - units_to_ticks(1),
-                                          units_to_ticks(1)))
-                duration = max(1, duration - 1)
-            elif input_char == '}':
-                for note in last_chord:
-                    note.set_duration(note.duration + units_to_ticks(1))
-                duration += 1
-
-            # Update duration and time for next insertion
-            if last_note is not None:
+                # Update duration and time for next insertion
                 duration = ticks_to_units(last_note.duration)
 
         elif input_char in tuple(',.<>'):
@@ -976,9 +1197,53 @@ def main(stdscr):
                                    x_sidebar_offset,
                                    min_x_offset)
 
+        # Change velocity
+        elif input_char in tuple(';:\'"'):
+            if input_char in tuple(';:'):
+                velocity = max(velocity - 1, 0)
+            else:
+                velocity = min(velocity + 1, MAX_VELOCITY)
+
+            MESSAGE = f'Velocity: {velocity}'
+
+            if input_char in tuple(';\''):
+                if last_note is not None:
+                    last_note.set_velocity(velocity)
+            else:
+                for note in last_chord:
+                    note.set_velocity(velocity)
+
+        # Change instrument
+        elif input_char in tuple('-_=+'):
+            if input_char in tuple('-_'):
+                if instrument == 0:
+                    instrument = TOTAL_INSTRUMENTS - 1
+                else:
+                    instrument -= 1
+            else:
+                if instrument == TOTAL_INSTRUMENTS - 1:
+                    instrument = 0
+                else:
+                    instrument += 1
+
+            MESSAGE = f'{instrument + 1}. {INSTRUMENT_NAMES[instrument]}'
+
+            if input_char in tuple('-='):
+                if last_note is not None:
+                    stop_notes(SYNTH, last_chord)
+                    last_note.set_instrument(instrument)
+                    play_notes(SYNTH, [last_note])
+            else:
+                for note in last_chord:
+                    stop_notes(SYNTH, last_chord)
+                    note.set_instrument(instrument)
+                    play_notes(SYNTH, last_chord)
+
         # Delete last note
         elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
             if last_note is not None:
+                if input_code == curses.KEY_DC:
+                    time += ticks_to_units(last_note.duration)
                 SONG.remove(last_note)
                 last_chord.remove(last_note)
                 last_note = None
@@ -1050,6 +1315,9 @@ def wrapper(stdscr):
 
     try:
         main(stdscr)
+    except Exception:
+        with open(CRASH_FILE, 'w') as crash_file:
+            crash_file.write(format_exc())
     finally:
         curses.cbreak()
         play_playback.set()

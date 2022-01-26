@@ -1,20 +1,24 @@
 # TODO
 
-- Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
-- Consider refactoring Song to store tracks/channels/instruments, removing that data from Notes themselves
-- Prompt/menu to select instrument
-- Focus on specific instrument (hide and mute others)
-- Display drum names on sidebar when editing drums
-- Separate drum window with a custom set of drums to use?
-- Color notes based on their category (piano, brass, etc.)
-- Set note velocity, preserve for subsequent notes
-- Select notes/chords under the cursor (keybind or automatic)
-- Measure select and delete/cut/copy/paste
-- Transposition
-- Undo/redo stack
-- Stack of previous notes for backspacing, or automatic selection
-- Keybind to sync playhead to cursor and vice versa
-- View details in normal mode
+- Refactoring
+	- Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
+	- Consider refactoring Song to store tracks/channels/instruments, removing that data from Notes themselves
+- Editing
+	- Select notes/chords under the cursor (keybind or automatic)
+	- Set note velocity, preserve for subsequent notes
+	- Select all notes in a time range (visual mode)
+	- Delete/cut/copy/paste
+	- Transpose
+	- Undo/redo stack
+	- Stack of previous notes for backspacing, or automatic selection
+	- Keybind to sync playhead to cursor and vice versa
+	- View details in normal mode
+- Instruments
+	- Prompt/menu to select instrument
+	- Focus on specific instrument (hide and mute others)
+	- Display drum names on sidebar when editing drums
+	- Separate drum window with a custom set of drums to use?
+	- Color notes based on their instrument's category (piano, brass, etc.)
 - MIDI port I/O
 - Mouse support (if possible)
 - Documentation
