@@ -13,6 +13,7 @@
 	- View details in normal mode
 	- Horizontal zoom: change units per beat in-editor
 	- Basic chord identification
+	- Chord insert mode
 	- Display measure on status bar as a fraction of progress through the song
 - Instruments
 	- Temporarily highlight notes when switching channels
