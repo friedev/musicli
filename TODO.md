@@ -2,7 +2,6 @@
 
 - Refactoring
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
-	- Consider refactoring Song to store tracks/channels/instruments, removing that data from Notes themselves
 - Editing
 	- Select notes/chords under the cursor (keybind or automatic)
 	- Select all notes in a time range (visual mode)
@@ -13,7 +12,10 @@
 	- Keybind to sync playhead to cursor and vice versa
 	- View details in normal mode
 	- Horizontal zoom: change units per beat in-editor
+	- Basic chord identification
+	- Display measure on status bar as a fraction of progress through the song
 - Instruments
+	- Temporarily highlight notes when switching channels
 	- Prompt/menu to select instrument
 	- Focus on specific instrument (hide and mute others)
 	- Display drum names on sidebar when editing drums

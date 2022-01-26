@@ -108,12 +108,16 @@ These notes are highlighted in white and gray respectively.
 - Up/Down: Edit one octave above/below your current range.
 - Left/Right: Edit one step forward or backward in time.
   The number of beats you will travel is equal to the duration of the last note inserted.
+- Backspace/Delete: Delete the last note entered.
+  Currently only works for the very last note, and none before it.
 - `[`/`]`: Adjust the duration of the last note entered by one unit.
   Holding Shift will affect the last chord.
 - `,`/`.`: Adjust the beat of the last note entered by one unit.
   Holding Shift will affect the last chord.
-- Backspace/Delete: Delete the last note entered.
-  Currently only works for the very last note, and none before it.
+- `;`/`'`: Adjust the velocity of current note by 1.
+  Holding Shift will affect the last chord.
+- `-`/`=`: Switch to the previous or next track.
+- `_`/`+`: Set this track to use the next or previous instrument.
 - Space: Play, pause, or resume music playback, if a soundfont was provided with `-f` or `--soundfont`.
 - Enter: Restart from the beginning of the song.
 - `Ctrl+C`: Exit MusiCLI.

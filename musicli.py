@@ -82,20 +82,25 @@ SCALE_NAME_MAP = {
 
 TOTAL_NOTES = 127
 NOTES_PER_OCTAVE = 12
+DEFAULT_OCTAVE = 4
+
 MAX_VELOCITY = 127
 DEFAULT_VELOCITY = MAX_VELOCITY  # 64 is recommended, but seems quiet
-DEFAULT_OCTAVE = 4
+
 TOTAL_INSTRUMENTS = 127  # Drums replace gunshot as instrument 128
 DEFAULT_CHANNEL = 0
 DEFAULT_BANK = 0
+
 DRUM_CHANNEL = 9
 DRUM_TRACK = 127  # Can't use 128 as MIDI only supports 127 tracks
 DRUM_BANK = 128
 DRUM_INSTRUMENT = 0
 DRUM_OFFSET = 35
+
 DEFAULT_FILE = 'untitled.mid'
 DEFAULT_SOUNDFONT = '/usr/share/soundfonts/default.sf2'
 CRASH_FILE = 'crash.log'
+
 ESCDELAY = 25
 
 INSERT_KEYMAP = {
@@ -342,8 +347,9 @@ play_playback = Event()
 restart_playback = Event()
 kill_threads = Event()
 
-PLAYHEAD = 0
 SONG = None
+SOUNDFONT = None
+PLAYHEAD = 0
 MESSAGE = ''
 
 
@@ -417,8 +423,9 @@ class DummyNote:
 class Song:
     def __init__(self):
         self.notes = []
+        self.tracks = []
 
-    def add(self, note, pair=True):
+    def add_note(self, note, pair=True):
         if note in self:
             raise ValueError('Note {note} is already in this song')
 
@@ -430,28 +437,61 @@ class Song:
                 raise ValueError('Note {note.pair} is already in this song')
             insort(self.notes, note.pair)
 
-    def remove(self, note, pair=True):
+    def remove_note(self, note, pair=True):
         self.notes.remove(note)
         if pair:
             if note.pair is None:
                 raise ValueError('Note {note} is unpaired')
             self.notes.remove(note.pair)
 
-    def move(self, note, time):
-        self.remove(note)
+    def move_note(self, note, time):
+        self.remove_note(note)
         note.move(time)
-        self.add(note)
+        self.add_note(note)
 
     def set_duration(self, note, duration):
-        self.remove(note)
+        self.remove_note(note)
         note.set_duration(duration)
-        self.add(note)
+        self.add_note(note)
 
-    def get_next_index(self, time):
-        return bisect_left(self.notes, DummyNote(time))
+    def get_next_index(self, time, track=None):
+        index = bisect_left(self.notes, DummyNote(time))
+        if track is None:
+            return index
+        while index < len(self.notes) and self[index].track is not track:
+            index += 1
+        return index
 
     def get_next_note(self, time):
         return self[self.get_next_index(time)]
+
+    @property
+    def notes_by_track(self):
+        return notes_by_track(self.notes)
+
+    def get_notes_in_track(self, track):
+        notes = []
+        for note in self.notes:
+            if note.track is track:
+                notes.append(note)
+        return notes
+
+    def has_channel(self, channel):
+        for track in self.tracks:
+            if track.channel == channel:
+                return True
+        return False
+
+    def get_track(self, channel, create=True, synth=None):
+        for track in self.tracks:
+            if track.channel == channel:
+                return track
+        if create:
+            track = Track(channel)
+            track.set_instrument(ARGS.default_instrument, synth)
+            self.tracks.append(track)
+            return track
+        return None
 
     def __len__(self):
         return len(self.notes)
@@ -463,15 +503,53 @@ class Song:
         return item in self.notes
 
 
+class Track:
+    def __init__(self, channel):
+        self.channel = channel
+        self.instrument = None
+
+    @property
+    def is_drum(self):
+        return self.channel == DRUM_CHANNEL
+
+    @property
+    def instrument_name(self):
+        if self.is_drum:
+            return 'Drums'
+        return INSTRUMENT_NAMES[self.instrument]
+
+    @property
+    def color_pair(self):
+        if self.channel == DRUM_CHANNEL:
+            return PAIR_DRUM
+        return INSTRUMENT_PAIRS[self.instrument % len(INSTRUMENT_PAIRS)]
+
+    def set_instrument(self, instrument, synth=None):
+        self.instrument = instrument
+        if synth is not None:
+            if self.is_drum:
+                synth.program_select(self.channel,
+                                     SOUNDFONT,
+                                     DRUM_BANK,
+                                     instrument)
+            else:
+                synth.program_select(self.channel,
+                                     SOUNDFONT,
+                                     DEFAULT_BANK,
+                                     instrument)
+
+    def __hash__(self):
+        return hash(self.channel)
+
+
 class Note:
     def __init__(self,
                  on,
                  number,
                  time,
-                 duration=None,
+                 track,
                  velocity=DEFAULT_VELOCITY,
-                 instrument=None,
-                 channel=DEFAULT_CHANNEL):
+                 duration=None):
         if time < 0:
             raise ValueError(f'Time must be non-negative; was {time}')
 
@@ -479,9 +557,7 @@ class Note:
         self.number = number
         self.time = time
         self.velocity = velocity
-        self.instrument = (ARGS.default_instrument if instrument is None else
-                           instrument)
-        self.channel = channel
+        self.track = track
 
         self.pair = None
         if duration is not None:
@@ -502,8 +578,7 @@ class Note:
                          number=self.number,
                          time=time,
                          velocity=self.velocity,
-                         instrument=self.instrument,
-                         channel=self.channel)
+                         track=self.track)
         self.pair.pair = self
 
     @property
@@ -528,7 +603,11 @@ class Note:
 
     @property
     def semitone(self):
-        return self.number % 12
+        return self.number % NOTES_PER_OCTAVE
+
+    @property
+    def octave(self):
+        return self.number // NOTES_PER_OCTAVE - 1
 
     @property
     def name(self):
@@ -544,35 +623,26 @@ class Note:
         return number_to_name(self.number, key, octave=octave)
 
     @property
-    def octave(self):
-        return self.number // 12 - 1
+    def channel(self):
+        return self.track.channel
+
+    @property
+    def is_drum(self):
+        return self.track.is_drum
+
+    @property
+    def instrument(self):
+        return self.track.instrument
 
     @property
     def instrument_name(self):
         if self.is_drum:
             return DRUM_NAMES[self.number - DRUM_OFFSET]
-        return INSTRUMENT_NAMES[self.instrument]
-
-    @property
-    def is_drum(self):
-        return self.channel == DRUM_CHANNEL
-
-    @property
-    def track(self):
-        return DRUM_TRACK if self.is_drum else self.instrument
+        return self.track.instrument_name
 
     @property
     def color_pair(self):
-        if self.is_drum:
-            return PAIR_DRUM
-        return INSTRUMENT_PAIRS[self.instrument %
-                                len(INSTRUMENT_PAIRS)]
-
-    def play(self, synth):
-        synth.noteon(self.track, self.number, self.velocity)
-
-    def stop(self, synth):
-        synth.noteoff(self.track, self.number)
+        return self.track.color_pair
 
     def move(self, time):
         if self.pair is not None:
@@ -604,14 +674,14 @@ class Note:
         if self.pair is not None:
             self.pair.velocity = velocity
 
-    def set_instrument(self, instrument):
-        if not 0 <= instrument < TOTAL_INSTRUMENTS:
-            raise ValueError('Instrument must be in the range '
-                             f'0-{TOTAL_INSTRUMENTS}; was {instrument}')
+    def play(self, synth):
+        if self.on:
+            synth.noteon(self.channel, self.number, self.velocity)
+        else:
+            synth.noteoff(self.channel, self.number)
 
-        self.instrument = instrument
-        if self.pair is not None:
-            self.pair.instrument = instrument
+    def stop(self, synth):
+        synth.noteoff(self.channel, self.number)
 
     def __str__(self):
         return f'{self.full_name} ({self.instrument_name} @ {self.velocity})'
@@ -627,45 +697,15 @@ class Note:
                 self.on == other.on and
                 self.number == other.number and
                 self.time == other.time and
-                self.track == other.track)
+                self.channel == other.channel)
 
 
-def messages_to_notes(messages, instrument=None):
-    if instrument is None:
-        instrument = ARGS.default_instrument
-    notes = []
-    active_notes = []
-    time = 0
-    for message in messages:
-        time += message.time
-        if message.type == 'note_on':
-            active_notes.append(Note(on=True,
-                                     number=message.note,
-                                     time=time,
-                                     velocity=message.velocity,
-                                     instrument=instrument,
-                                     channel=message.channel))
-        elif message.type == 'note_off':
-            for note in active_notes:
-                if note.number == message.note:
-                    duration = time - note.time
-                    if duration == 0:
-                        active_notes.remove(note)
-                    else:
-                        note.set_duration(duration)
-                        notes.append(note)
-                        notes.append(note.pair)
-                        active_notes.remove(note)
-                        break
-    return sorted(notes)
-
-
-def notes_to_tracks(notes):
+def notes_by_track(notes):
     tracks = {}
     for note in notes:
-        if note.instrument not in tracks:
-            tracks[note.instrument] = []
-        tracks[note.instrument].append(note)
+        if note.track not in tracks:
+            tracks[note.track] = []
+        tracks[note.track].append(note)
     return tracks
 
 
@@ -685,48 +725,68 @@ def notes_to_messages(notes):
     return messages
 
 
-def import_midi(infile_path):
+def import_midi(infile_path, synth):
     infile = MidiFile(infile_path)
     ARGS.ticks_per_beat = infile.ticks_per_beat
 
+    song = Song()
     notes = []
-    set_tempo = False
+    active_notes = []
+    tempo_set = False
     for track in infile.tracks:
-        instrument = 0
-
-        # Use the first set_tempo message in any track as the song tempo
-        # Use the first program_change message in this track as its instrument
-        program_change = False
+        time = 0
         for message in track:
-            if not set_tempo and message.type == 'set_tempo':
-                ARGS.beats_per_minute = tempo2bpm(message.tempo)
-                set_tempo = True
-            elif not program_change and message.type == 'program_change':
-                instrument = message.program
-                program_change = True
-            if set_tempo and program_change:
-                break
+            time += message.time
+            if message.type == 'note_on':
+                active_notes.append(Note(on=True,
+                                         number=message.note,
+                                         time=time,
+                                         velocity=message.velocity,
+                                         track=song.get_track(message.channel,
+                                                              create=True,
+                                                              synth=synth)))
+            elif message.type == 'note_off':
+                for note in active_notes:
+                    if note.number == message.note:
+                        duration = time - note.time
+                        if duration == 0:
+                            active_notes.remove(note)
+                        else:
+                            note.set_duration(duration)
+                            notes.append(note)
+                            notes.append(note.pair)
+                            active_notes.remove(note)
+                            break
+            # Use the first set_tempo message as the song tempo
+            elif message.type == 'set_tempo':
+                if not tempo_set:
+                    ARGS.beats_per_minute = tempo2bpm(message.tempo)
+                    tempo_set = True
+            # Use the first program_change message for each channel's instrument
+            elif message.type == 'program_change':
+                song.get_track(message.channel).set_instrument(message.program,
+                                                               synth)
+    song.notes = sorted(notes)
+    return song
 
-        notes += messages_to_notes(track, instrument)
-    return sorted(notes)
 
-
-def export_midi(notes, filename):
+def export_midi(song, filename):
     outfile = MidiFile(ticks_per_beat=ARGS.ticks_per_beat)
 
-    tracks = notes_to_tracks(notes)
-    for instrument, track_notes in tracks.items():
-        track = MidiTrack()
-        track.append(Message('program_change', program=instrument,
-                             channel=track_notes[0].channel))
-        for message in notes_to_messages(track_notes):
-            track.append(message)
-        outfile.tracks.append(track)
-
-    tempo_track = MidiTrack()
-    tempo_track.append(MetaMessage('set_tempo',
-                                   tempo=bpm2tempo(ARGS.beats_per_minute)))
-    outfile.tracks.append(tempo_track)
+    tempo_set = False
+    for track, notes in song.notes_by_track.items():
+        midi_track = MidiTrack()
+        if not tempo_set:
+            midi_track.append(MetaMessage('set_tempo',
+                                          tempo=bpm2tempo(
+                                                ARGS.beats_per_minute)))
+            tempo_set = True
+        midi_track.append(Message('program_change',
+                                  program=track.instrument,
+                                  channel=track.channel))
+        for message in notes_to_messages(notes):
+            midi_track.append(message)
+        outfile.tracks.append(midi_track)
 
     outfile.save(filename)
 
@@ -734,11 +794,8 @@ def export_midi(notes, filename):
 def init_synth():
     synth = Synth()
     synth.start()
-    soundfont = synth.sfload(ARGS.soundfont)
-    # For live playback, each track uses the instrument of the same number
-    for i in range(TOTAL_INSTRUMENTS):
-        synth.program_select(i, soundfont, DEFAULT_CHANNEL, i)
-    synth.program_select(DRUM_TRACK, soundfont, DRUM_BANK, DRUM_INSTRUMENT)
+    global SOUNDFONT
+    SOUNDFONT = synth.sfload(ARGS.soundfont)
     return synth
 
 
@@ -783,10 +840,7 @@ def start_playback(synth):
                 sys.exit(0)
 
             while note_index < len(SONG) and time == next_note.time:
-                if next_note.on:
-                    next_note.play(synth)
-                else:
-                    next_note.stop(synth)
+                next_note.play(synth)
                 note_index += 1
                 if note_index < len(SONG):
                     next_note = SONG[note_index]
@@ -794,8 +848,7 @@ def start_playback(synth):
 
 def play_notes(synth, notes):
     for note in notes:
-        if note.on:
-            note.play(synth)
+        note.play(synth)
 
 
 def stop_notes(synth, notes):
@@ -805,29 +858,27 @@ def stop_notes(synth, notes):
 
 def draw_scale_dots(window, key, scale, x_offset, y_offset):
     height, width = window.getmaxyx()
+    string = '·' if ARGS.unicode else '.'
+    attr = curses.color_pair(PAIR_LINE)
     for y, note in enumerate(range(y_offset, y_offset + height - 1)):
         semitone = note % NOTES_PER_OCTAVE
         if semitone in [(number + key) % NOTES_PER_OCTAVE for number in scale]:
             for x in range(-x_offset % 4, width - 1, 4):
-                window.addstr(height - y - 1, x, '·' if ARGS.unicode else '.',
-                              curses.color_pair(PAIR_LINE))
+                window.addstr(height - y - 1, x, string, attr)
 
 
 def draw_measures(window, x_offset):
     _, width = window.getmaxyx()
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
+    string = '▏' if ARGS.unicode else '|'
+    attr = curses.color_pair(PAIR_LINE)
     for x in range(-x_offset % units_per_measure,
-                   width - 1, units_per_measure):
-        draw_line(window,
-                  x,
-                  '▏' if ARGS.unicode else '|',
-                  curses.color_pair(PAIR_LINE),
-                  start_y=0)
+                   width - 1,
+                   units_per_measure):
+        draw_line(window, x, string, attr, start_y=0)
 
         # Measure number
-        window.addstr(0, x,
-                      str((x + x_offset) // units_per_measure + 1),
-                      curses.color_pair(PAIR_LINE))
+        window.addstr(0, x, str((x + x_offset) // units_per_measure + 1), attr)
 
 
 def draw_line(window, x, string, attr, start_y=1):
@@ -841,6 +892,7 @@ def draw_notes(window, song, last_note, last_chord, x_offset, y_offset):
     height, width = window.getmaxyx()
     time = units_to_ticks(x_offset)
     index = song.get_next_index(time)
+    string = '▏' if ARGS.unicode else '['
     for note in song.notes[index:]:
         start_x = ticks_to_units(note.start) - x_offset
         end_x = ticks_to_units(note.end) - x_offset
@@ -859,35 +911,36 @@ def draw_notes(window, song, last_note, last_chord, x_offset, y_offset):
             color_pair = PAIR_LAST_CHORD
         else:
             color_pair = note.color_pair
+        attr = curses.color_pair(color_pair)
 
         for x in range(max(start_x, 0), min(end_x, width - 1)):
-            window.addstr(y, x, ' ', curses.color_pair(color_pair))
+            window.addstr(y, x, ' ', attr)
 
         if 0 <= start_x < width - 1:
-            window.addstr(y, start_x, '▏' if ARGS.unicode else '[',
-                          curses.color_pair(color_pair))
+            window.addstr(y, start_x, string, attr)
 
         note_width = end_x - start_x
         if note_width >= 4 and (0 <= start_x + 1 and
                                 start_x + len(note.name) < width - 1):
-            window.addstr(y, start_x + 1, note.name,
-                          curses.color_pair(color_pair))
+            window.addstr(y, start_x + 1, note.name, attr)
 
 
 def draw_sidebar(window, octave, y_offset):
     height, _ = window.getmaxyx()
+    pair_note = curses.color_pair(PAIR_SIDEBAR_NOTE)
+    pair_key = curses.color_pair(PAIR_SIDEBAR_KEY)
     for y, number in enumerate(range(y_offset, y_offset + height)):
         note_name = number_to_name(number)
         insert_key = number - octave * NOTES_PER_OCTAVE
         window.addstr(height - y - 1,
                       0,
                       note_name.ljust(4).rjust(6),
-                      curses.color_pair(PAIR_SIDEBAR_NOTE))
+                      pair_note)
         if 0 <= insert_key < len(INSERT_KEYLIST):
             window.addstr(height - y - 1,
                           0,
                           INSERT_KEYLIST[insert_key],
-                          curses.color_pair(PAIR_SIDEBAR_KEY))
+                          pair_key)
 
 
 def draw_status_bar(window, insert, filename, time, message):
@@ -970,10 +1023,14 @@ def main(stdscr):
     Main render/input loop.
     '''
     global SONG, MESSAGE
-    SONG = Song()
 
     if ARGS.import_file and os.path.exists(ARGS.import_file):
-        SONG.notes = import_midi(ARGS.import_file)
+        SONG = import_midi(ARGS.import_file, SYNTH)
+    else:
+        SONG = Song()
+        new_track = Track(0)
+        SONG.tracks.append(new_track)
+        new_track.set_instrument(ARGS.default_instrument, SYNTH)
 
     height, width = stdscr.getmaxyx()
     units_per_measure = ARGS.units_per_beat * ARGS.beats_per_measure
@@ -984,14 +1041,17 @@ def main(stdscr):
     x_offset = min_x_offset
     y_offset = (DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE - height // 2
 
-    insert = False
     octave = DEFAULT_OCTAVE
     key = NAME_TO_NUMBER[ARGS.key]
     scale = SCALE_NAME_MAP[ARGS.scale]
+
     time = 0
     duration = ARGS.units_per_beat
     velocity = DEFAULT_VELOCITY
-    instrument = 0
+    track_index = 0
+    track = SONG.tracks[track_index]
+
+    insert = False
     last_note = None
     last_chord = []
     filename = ARGS.file if ARGS.file else DEFAULT_FILE
@@ -1013,7 +1073,7 @@ def main(stdscr):
         draw_measures(stdscr, x_offset)
         cursor_x = time + (0 if last_note is None else duration) - x_offset
         draw_line(stdscr, cursor_x, '▏' if ARGS.unicode else '|',
-                  curses.color_pair(0),)
+                  curses.color_pair(0))
         if SYNTH is not None:
             draw_line(stdscr, PLAYHEAD - x_offset, ' ',
                       curses.color_pair(PAIR_PLAYHEAD))
@@ -1065,16 +1125,16 @@ def main(stdscr):
                             time=units_to_ticks(time),
                             duration=units_to_ticks(duration),
                             velocity=velocity,
-                            instrument=instrument)
+                            track=track)
 
                 if note in SONG.notes:
-                    SONG.remove(note)
+                    SONG.remove_note(note)
                     if note == last_note:
                         last_note = None
                     if note in last_chord:
                         last_chord.remove(note)
                 else:
-                    SONG.add(note)
+                    SONG.add_note(note)
                     last_note = note
                     last_chord.append(note)
 
@@ -1120,7 +1180,7 @@ def main(stdscr):
 
             # Export to MIDI
             elif input_char == 'w':
-                export_midi(SONG.notes, filename)
+                export_midi(SONG, filename)
                 MESSAGE = f'Wrote MIDI to {filename}'
 
             # Q doesn't quit
@@ -1192,7 +1252,7 @@ def main(stdscr):
                     else:
                         new_start = last_note.start + units_to_ticks(1)
                         time += 1
-                    SONG.move(last_note, new_start)
+                    SONG.move_note(last_note, new_start)
 
                 # Shift last chord
                 else:
@@ -1203,7 +1263,7 @@ def main(stdscr):
                         else:
                             note.start += units_to_ticks(1)
                             time += 1
-                        SONG.move(note, new_start)
+                        SONG.move_note(note, new_start)
 
                 if time < x_offset or time >= x_offset + width:
                     new_offset = time - width // 2
@@ -1228,38 +1288,43 @@ def main(stdscr):
                 for note in last_chord:
                     note.set_velocity(velocity)
 
+        # Change track
+        elif input_char in tuple('-='):
+            if input_char == '-':
+                track_index -= 1
+            else:
+                track_index += 1
+            track_index %= len(SONG.tracks)
+            track = SONG.tracks[track_index]
+
+            MESSAGE = f'Track {track_index + 1}: {track.instrument_name}'
+
         # Change instrument
-        elif input_char in tuple('-_=+'):
-            if input_char in tuple('-_'):
-                if instrument == 0:
-                    instrument = TOTAL_INSTRUMENTS - 1
-                else:
-                    instrument -= 1
-            else:
-                if instrument == TOTAL_INSTRUMENTS - 1:
-                    instrument = 0
-                else:
-                    instrument += 1
+        elif input_char in tuple('_+'):
+            for note in last_chord:
+                stop_notes(SYNTH, last_chord)
 
-            MESSAGE = f'{instrument + 1}. {INSTRUMENT_NAMES[instrument]}'
-
-            if input_char in tuple('-='):
-                if last_note is not None:
-                    stop_notes(SYNTH, last_chord)
-                    last_note.set_instrument(instrument)
-                    play_notes(SYNTH, [last_note])
+            instrument = SONG.tracks[track_index].instrument
+            if input_char == '_':
+                instrument -= 1
             else:
-                for note in last_chord:
-                    stop_notes(SYNTH, last_chord)
-                    note.set_instrument(instrument)
-                    play_notes(SYNTH, last_chord)
+                instrument += 1
+            instrument %= TOTAL_INSTRUMENTS
+
+            track.set_instrument(instrument, SYNTH)
+
+            MESSAGE = f'Track {track_index + 1}: {track.instrument_name}'
+
+            for note in last_chord:
+                play_notes(SYNTH, last_chord)
 
         # Delete last note
         elif input_code in (curses.KEY_DC, curses.KEY_BACKSPACE):
             if last_note is not None:
+                last_note.stop(SYNTH)
                 if input_code == curses.KEY_DC:
                     time += ticks_to_units(last_note.duration)
-                SONG.remove(last_note)
+                SONG.remove_note(last_note)
                 last_chord.remove(last_note)
                 last_note = None
 
