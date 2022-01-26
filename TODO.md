@@ -5,9 +5,8 @@
 	- Consider refactoring Song to store tracks/channels/instruments, removing that data from Notes themselves
 - Editing
 	- Select notes/chords under the cursor (keybind or automatic)
-	- Set note velocity, preserve for subsequent notes
 	- Select all notes in a time range (visual mode)
-	- Delete/cut/copy/paste
+	- Delete/cut/copy/paste selected notes
 	- Transpose
 	- Undo/redo stack
 	- Stack of previous notes for backspacing, or automatic selection
@@ -19,6 +18,7 @@
 	- Display drum names on sidebar when editing drums
 	- Separate drum window with a custom set of drums to use?
 	- Color notes based on their instrument's category (piano, brass, etc.)
+- Track notes currently being played, and stop them when playback is paused
 - MIDI port I/O
 - Mouse support (if possible)
 - Documentation

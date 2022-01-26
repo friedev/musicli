@@ -439,6 +439,11 @@ class Song:
         note.move(time)
         self.add(note)
 
+    def set_duration(self, note, duration):
+        self.remove(note)
+        note.set_duration(duration)
+        self.add(note)
+
     def get_next_index(self, time):
         return bisect_left(self.notes, DummyNote(time))
 
@@ -499,18 +504,24 @@ class Note:
         self.pair.pair = self
 
     @property
+    def on_pair(self):
+        return self if self.on else self.pair
+
+    @property
+    def off_pair(self):
+        return self.pair if self.on else self
+
+    @property
     def start(self):
-        return self.time if self.on else self.pair.time
+        return self.on_pair.time
 
     @property
     def end(self):
-        return self.pair.time if self.on else self.time
+        return self.off_pair.time
 
     @property
     def duration(self):
-        if self.on:
-            return self.pair.time - self.time
-        return self.time - self.pair.time
+        return self.off_pair.time - self.on_pair.time
 
     @property
     def semitone(self):
@@ -561,11 +572,10 @@ class Note:
         synth.noteoff(self.track, self.number)
 
     def move(self, time):
-        if self.on:
-            if self.pair is not None:
+        if self.pair is not None:
+            if self.on:
                 self.pair.time = time + self.duration
-        else:
-            if self.pair is not None:
+            else:
                 self.pair.time = time - self.duration
                 if self.pair.time < 0:
                     raise ValueError('New start time must be non-negative; '
@@ -580,10 +590,7 @@ class Note:
             self.make_pair(self.time + duration if self.on else
                            self.time - duration)
         else:
-            if self.on:
-                self.pair.time = self.time + duration
-            else:
-                self.time = self.pair.time + duration
+            self.off_pair.time = self.on_pair.time + duration
 
     def set_velocity(self, velocity):
         if not 0 <= velocity < MAX_VELOCITY:
@@ -827,30 +834,30 @@ def draw_line(window, x, string, attr, start_y=1):
             window.addstr(y, x, string, attr)
 
 
-def draw_notes(window, notes, last_note, last_chord, x_offset, y_offset):
-    # TODO only iterate over notes in view (assume list is sorted)
+def draw_notes(window, song, last_note, last_chord, x_offset, y_offset):
     height, width = window.getmaxyx()
-    for note in notes:
-        if not note.on:
+    time = units_to_ticks(x_offset)
+    index = song.get_next_index(time)
+    for note in song.notes[index:]:
+        start_x = ticks_to_units(note.start) - x_offset
+        end_x = ticks_to_units(note.end) - x_offset
+        if start_x >= width - 1:
+            if note.on:
+                break
             continue
 
         y = height - (note.number - y_offset) - 1
-        if y <= 0 or y >= height:
+        if not 0 < y < height:
             continue
 
-        start_x = ticks_to_units(note.start) - x_offset
-        end_x = ticks_to_units(note.end) - x_offset
-        if end_x < 0 or start_x >= width - 1:
-            continue
-
-        if note is last_note:
+        if note is last_note or note.pair is last_note:
             color_pair = PAIR_LAST_NOTE
         elif note in last_chord:
             color_pair = PAIR_LAST_CHORD
         else:
             color_pair = note.color_pair
 
-        for x in range(max(0, start_x), min(width - 1, end_x)):
+        for x in range(max(start_x, 0), min(end_x, width - 1)):
             window.addstr(y, x, ' ', curses.color_pair(color_pair))
 
         if 0 <= start_x < width - 1:
@@ -1007,8 +1014,7 @@ def main(stdscr):
         if SYNTH is not None:
             draw_line(stdscr, PLAYHEAD - x_offset, ' ',
                       curses.color_pair(PAIR_PLAYHEAD))
-        draw_notes(stdscr, SONG.notes, last_note, last_chord, x_offset,
-                   y_offset)
+        draw_notes(stdscr, SONG, last_note, last_chord, x_offset, y_offset)
         draw_sidebar(stdscr, octave, y_offset)
         draw_status_bar(stdscr, insert, filename, time, MESSAGE)
 
@@ -1145,23 +1151,24 @@ def main(stdscr):
             if last_note is not None:
                 # Change duration of last note
                 if input_char == '[':
-                    last_note.set_duration(max(last_note.duration -
-                                               units_to_ticks(1),
-                                               units_to_ticks(1)))
+                    SONG.set_duration(last_note, max(last_note.duration -
+                                                     units_to_ticks(1),
+                                                     units_to_ticks(1)))
                 elif input_char == ']':
-                    last_note.set_duration(last_note.duration +
-                                           units_to_ticks(1))
+                    SONG.set_duration(last_note,
+                                      last_note.duration + units_to_ticks(1))
 
                 # Change duration of last chord
                 elif input_char == '{':
                     for note in last_chord:
-                        note.set_duration(max(note.duration -
-                                              units_to_ticks(1),
-                                              units_to_ticks(1)))
+                        SONG.set_duration(note, max(note.duration -
+                                                    units_to_ticks(1),
+                                                    units_to_ticks(1)))
                     duration = max(1, duration - 1)
                 elif input_char == '}':
                     for note in last_chord:
-                        note.set_duration(note.duration + units_to_ticks(1))
+                        SONG.set_duration(note,
+                                          note.duration + units_to_ticks(1))
                     duration += 1
 
                 # Update duration and time for next insertion
