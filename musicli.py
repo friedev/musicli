@@ -67,14 +67,17 @@ SCALE_MINOR_NATURAL = [0, 2, 3, 5, 7, 8, 10]
 SCALE_MINOR_HARMONIC = [0, 2, 3, 5, 7, 8, 11]
 SCALE_MINOR_PENTATONIC = [0, 3, 5, 7, 10]
 SCALE_BLUES = [0, 3, 5, 6, 7, 10]
+SCALE_CHROMATIC = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 SCALE_NAME_MAP = {
     'major': SCALE_MAJOR,
     'major_pentatonic': SCALE_MAJOR_PENTATONIC,
+    'minor': SCALE_MINOR_NATURAL,
     'natural_minor': SCALE_MINOR_NATURAL,
     'harmonic_minor': SCALE_MINOR_HARMONIC,
     'minor_pentatonic': SCALE_MAJOR_PENTATONIC,
     'blues': SCALE_BLUES,
+    'chromatic': SCALE_CHROMATIC,
 }
 
 TOTAL_NOTES = 127

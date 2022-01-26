@@ -23,5 +23,4 @@
 - MIDI port I/O
 - Mouse support (if possible)
 - Documentation
-- Screenshot(s)
 - Remove strict dependencies, allow partial functionality in their absence

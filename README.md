@@ -42,7 +42,7 @@ You may also provide no file; if you choose to save later, it will be saved as `
 
 If you wish to import a MIDI file, but save changes to another file, use the `--import` or `-i` option:
 ```sh
-./musicly.py file_to_export.mid -i file_to_import.mid -f soundfont.sf2
+./musicli.py file_to_export.mid -i file_to_import.mid -f soundfont.sf2
 ```
 
 Providing a soundfont is also optional, but live playback will be unavailable unless you do.
