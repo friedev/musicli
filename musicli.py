@@ -897,7 +897,7 @@ def draw_status_bar(window, insert, filename, time, message):
 
     mode_text = f' {"INSERT" if insert else "NORMAL"} '
     filename_text = f' {filename} '
-    key_scale_text = f' {ARGS.key} {ARGS.scale} '
+    key_scale_text = f' {ARGS.key} {ARGS.scale.replace("_", " ")} '
     play = PLAYHEAD
     play_text = (
             f' P{play // ARGS.units_per_beat // ARGS.beats_per_measure + 1}'
@@ -1173,6 +1173,11 @@ def main(stdscr):
 
                 # Update duration and time for next insertion
                 duration = ticks_to_units(last_note.duration)
+            else:
+                if input_char in tuple('[{'):
+                    duration = max(duration - 1, 1)
+                else:
+                    duration += 1
 
         elif input_char in tuple(',.<>'):
             if last_note is not None:
