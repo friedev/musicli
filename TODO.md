@@ -2,18 +2,18 @@
 
 - Refactoring
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
+	- Refactor main to use a class for storing state in fields and using methods for each action
 - Editing
-	- Select notes/chords under the cursor (keybind or automatic)
+	- Automatically select previous chord when backspacing
 	- Select all notes in a time range (visual mode)
 	- Delete/cut/copy/paste selected notes
 	- Transpose
 	- Undo/redo stack
-	- Stack of previous notes for backspacing, or automatic selection
 	- Keybind to sync playhead to cursor and vice versa
 	- View details in normal mode
-	- Horizontal zoom: change units per beat in-editor
-	- Basic chord identification
-	- Chord insert mode
+	- Horizontal zoom: change units per beat in-editor (i/o in normal mode)
+	- Basic chord identification in format_notes
+	- Chord insert mode: when a key is pressed, its natural chord in the current key/scale is inserted
 	- Display measure on status bar as a fraction of progress through the song
 - Instruments
 	- Temporarily highlight notes when switching channels

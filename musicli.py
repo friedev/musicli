@@ -1298,20 +1298,31 @@ def main(stdscr):
                     x_offset = max(x_offset - delta, min_x_offset)
                 else:
                     x_offset += delta
-            if input_lower in tuple('kj'):
+            elif input_lower in tuple('kj'):
                 delta = 1 if input_char.isupper() else NOTES_PER_OCTAVE
                 if input_char.lower() == 'j':
                     y_offset = max(y_offset - delta, min_y_offset)
                 if input_char.lower() == 'k':
                     y_offset = min(y_offset + delta, max_y_offset)
 
+            elif input_char in tuple('0^$'):
+                jump_time = 0 if input_char in tuple('0^') else SONG.end
+                x_offset = snap_to_time(stdscr,
+                                        jump_time,
+                                        x_offset,
+                                        min_x_offset,
+                                        x_sidebar_offset)
+
             # Enter insert mode
-            elif input_char in tuple('ia'):
-                # TODO add capital I/A to jump to start/end
+            elif input_lower in tuple('ia'):
                 insert = True
 
                 if input_char == 'a':
                     time += duration
+                elif input_char == 'I':
+                    time = 0
+                elif input_char == 'A':
+                    time = SONG.end
 
                 x_offset = snap_to_time(stdscr,
                                         time,
@@ -1330,8 +1341,22 @@ def main(stdscr):
             elif input_lower == 'q':
                 MESSAGE = 'Press Ctrl+C to exit MusiCLI'
 
+        # Pan view
+        if input_code in (curses.KEY_HOME, curses.KEY_END)):
+            jump_time = 0 if input_code in curses.KEY_HOME else SONG.end
+            x_offset = snap_to_time(stdscr,
+                                    jump_time,
+                                    x_offset,
+                                    min_x_offset,
+                                    x_sidebar_offset)
+
+        elif input_code == curses.KEY_PPAGE:
+            y_offset = max_y_offset
+        elif input_code == curses.KEY_NPAGE:
+            y_offset = min_y_offset
+
         # Move the editing cursor and octave
-        if input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
+        elif input_code in (curses.KEY_LEFT, curses.KEY_RIGHT):
             if input_code == curses.KEY_LEFT:
                 nearest_chord = SONG.get_previous_chord(time, track)
                 if len(nearest_chord) > 0:
@@ -1439,6 +1464,7 @@ def main(stdscr):
                                         x_offset,
                                         min_x_offset,
                                         x_sidebar_offset)
+
         # Change velocity
         elif input_char in tuple(';:\'"'):
             if input_char in tuple(';:'):

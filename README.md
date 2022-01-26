@@ -105,6 +105,9 @@ These notes are highlighted in white and gray respectively.
 
 #### All Modes
 
+- Page Up/Down: Jump to the highest/lowest note.
+- Home/End: Jump to the beginning/end of the song.
+- `$`: Jump to the end of the song.
 - Up/Down: Edit one octave above/below your current range.
 - Left/Right: Edit one step forward or backward in time.
   The number of beats you will travel is equal to the duration of the last note inserted.
@@ -125,6 +128,8 @@ These notes are highlighted in white and gray respectively.
 #### Normal Mode
 
 - `hjkl`: Pan the view. Holding Shift will cause you to pan in smaller steps.
+- `0`/`^`: Jump to the beginning of the song.
+- `$`: Jump to the end of the song.
 - `w`: Export the song as a MIDI file.
   **If you opened an existing file (using the `file` parameter), it will be overwritten.**
   Files imported with the `--import` argument will be unaffected.
@@ -132,6 +137,8 @@ These notes are highlighted in white and gray respectively.
   If you did not specify a path, the file will be saved as `untitled.mid`.
 - `i`: Enter insert mode.
 - `a`: Enter insert mode and advance one step.
+- `I`: Enter insert mode and jump to the beginning of the song.
+- `A`: Enter insert mode and jump to the end of the song.
 - Escape: Deselect notes.
 
 #### Insert Mode
