@@ -110,8 +110,24 @@ These notes are highlighted in white and gray respectively.
 
 ## Troubleshooting
 
-If MusiCLI crashes, it should create a `crash.log` file (or whatever file you have configured with `--crash-file`).
-If this happens, please submit an issue on GitHub with the contents of this file, and a description of what you were doing right before the crash happened.
+> The color gray isn't showing up and every note in the selected chord is white.
+
+Your terminal probably does not have gray as color 8.
+You may be able to change this in your terminal's color scheme settings.
+
+Terminals known to support gray include [Alacritty](https://alacritty.org/) and [foot](https://codeberg.org/dnkl/foot).
+Terminals known not to support gray include [cool-retro-term](https://github.com/Swordfish90/cool-retro-term).
+[pywal](https://github.com/dylanaraps/pywal) is also compatible.
+
+> MusiCLI just crashed. What do I do?
+
+A `crash.log` file should have been generated (or a different file if you set the `--crash-file` option).
+If not, there may be some output directly in the terminal.
+In any case, please submit an issue on GitHub with the contents of the file or the error messages in the terminal, and a description of what you were doing right before the crash happened.
+This will help get the issue resolved as soon as possible!
+
+If MusiCLI didn't crash, but playback stopped working and you got a bunch of text appearing in weird places on the screen, the FluidSynth thread probably crashed.
+Currently, getting the error messages out of a failure like this are challenging, so just try to copy/paste or screenshot what you can of the error messages that appeared on screen.
 
 ## Contributing
 
