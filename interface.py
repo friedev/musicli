@@ -427,7 +427,8 @@ class Interface:
         filename_text = f' {self.filename} ' if self.filename else ''
         key_scale_text = (f' {self.song.key_name} '
                           f'{self.song.scale_name.replace("_", " ")} ')
-        track_text = f' {self.track_index + 1}: {self.track.instrument_name} '
+        track_text = (f' T{self.track_index + 1}/{len(self.song.tracks)}: '
+                      f'{self.track.instrument_name} ')
         end_measure = (self.song.ticks_to_beats(self.song.end) //
                        self.song.beats_per_measure +
                        1)
@@ -443,7 +444,7 @@ class Interface:
         edit_measure = (self.song.ticks_to_beats(self.time) //
                         self.song.beats_per_measure +
                         1)
-        edit_text = (f' E{edit_measure}/{end_measure} ')
+        edit_text = (f' C{edit_measure}/{end_measure} ')
         attr = curses.color_pair(PAIR_STATUS_INSERT if self.insert else
                                  PAIR_STATUS_NORMAL)
         x = 0
