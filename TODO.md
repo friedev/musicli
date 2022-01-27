@@ -3,7 +3,6 @@
 - Refactoring
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
 - Editing
-	- Automatically select previous chord when backspacing
 	- Select all notes in a time range (visual mode)
 	- Delete/cut/copy/paste selected notes
 	- Transpose
@@ -12,7 +11,6 @@
 	- Basic chord identification in format_notes
 	- Chord insert mode: when a key is pressed, its natural chord in the current key/scale is inserted
 - Instruments
-	- Prompt/menu to select instrument
 	- Focus on specific instrument (hide and mute others)
 	- Display drum names on sidebar when editing drums
 	- Separate drum window with a custom set of drums to use?

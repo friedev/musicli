@@ -73,6 +73,7 @@ class Action(Enum):
     DELETE_NOTE = 'delete the selected note'
     DELETE_NOTE_BACK = 'delete the selected note and step back'
     DELETE_CHORD = 'delete the selected chord'
+    DELETE_CHORD_BACK = 'delete the selected chord and step back'
     TIME_NOTE_DEC = 'decrease the start time of the selected note'
     TIME_NOTE_INC = 'increase the start time of the selected note'
     TIME_CHORD_DEC = 'decrease the start time of the selected chord'
@@ -126,11 +127,13 @@ KEYMAP = {
     ord('A'): Action.MODE_INSERT_END,
     curses.KEY_IC: Action.MODE_INSERT,
     ord('x'): Action.DELETE_NOTE,
+    ord('X'): Action.DELETE_NOTE_BACK,
     ord('d'): Action.DELETE_CHORD,
+    ord('D'): Action.DELETE_CHORD,
     curses.ascii.TAB: Action.CYCLE_NOTES,
     ord('`'): Action.DESELECT_NOTES,
     curses.KEY_DC: Action.DELETE_NOTE,
-    curses.KEY_BACKSPACE: Action.DELETE_NOTE_BACK,
+    curses.KEY_BACKSPACE: Action.DELETE_CHORD_BACK,
     ord(','): Action.TIME_NOTE_DEC,
     ord('.'): Action.TIME_NOTE_INC,
     ord('<'): Action.TIME_CHORD_DEC,
@@ -148,11 +151,15 @@ KEYMAP = {
     ord('_'): Action.INSTRUMENT_DEC,
     ord('+'): Action.INSTRUMENT_INC,
     ord('o'): Action.TRACK_CREATE,
-    ord('D'): Action.TRACK_DELETE,
+    ord('O'): Action.TRACK_CREATE,
+    ord('t'): Action.TRACK_CREATE,
+    ord('T'): Action.TRACK_DELETE,
     ord(' '): Action.PLAYBACK_TOGGLE,
     curses.ascii.LF: Action.PLAYBACK_RESTART,
     ord('w'): Action.WRITE_MIDI,
+    ord('W'): Action.WRITE_MIDI,
     ord('q'): Action.QUIT_HELP,
+    ord('Q'): Action.QUIT_HELP,
 }
 
 INSERT_KEYMAP = {
@@ -259,6 +266,7 @@ class Interface:
         self.filename = filename
         self.unicode = unicode
         self.highlight_track = False
+        self.solo_track = False
 
         init_color_pairs()
 
@@ -484,20 +492,28 @@ class Interface:
         self.draw_sidebar()
         self.draw_status_bar()
 
-    def play_note(self, note):
+    def play_note(self, note=None):
+        if note is None:
+            note = self.last_note
         if self.player is not None and not self.player.playing:
             self.player.play_note(note)
 
-    def stop_note(self, note):
+    def stop_note(self, note=None):
+        if note is None:
+            note = self.last_note
         if self.player is not None and not self.player.playing:
             self.player.stop_note(note)
 
-    def play_notes(self, notes):
+    def play_notes(self, notes=None):
+        if notes is None:
+            notes = self.last_chord
         if self.player is not None and not self.player.playing:
             for note in notes:
                 self.player.play_note(note)
 
-    def stop_notes(self, notes):
+    def stop_notes(self, notes=None):
+        if notes is None:
+            notes = self.last_chord
         if self.player is not None and not self.player.playing:
             for note in notes:
                 self.player.stop_note(note)
@@ -535,7 +551,7 @@ class Interface:
 
     def insert_note(self, number, chord=False):
         if not PLAY_EVENT.is_set():
-            self.stop_notes(self.last_chord)
+            self.stop_notes()
 
         if self.last_note is not None and not chord:
             self.time += self.duration
@@ -565,7 +581,7 @@ class Interface:
         self.message = self.format_notes(self.last_chord)
 
         if not PLAY_EVENT.is_set():
-            self.play_notes(self.last_chord)
+            self.play_notes()
 
     def move_cursor(self, left):
         if left:
@@ -577,12 +593,12 @@ class Interface:
             else:
                 nearest_time = 0
                 end_time = 0
+
             if (self.last_note is not None and
                     end_time >= self.last_note.start):
                 self.time = nearest_time
             else:
                 self.time = max(self.time - self.duration, nearest_time, 0)
-
         else:
             chord_time = self.time
             inclusive = self.last_note is None
@@ -702,7 +718,7 @@ class Interface:
         self.message = format_track(self.track_index, self.track)
 
     def set_instrument(self, increase):
-        self.stop_notes(self.last_chord)
+        self.stop_notes()
 
         instrument = self.song.tracks[self.track_index].instrument
         if increase:
@@ -715,29 +731,31 @@ class Interface:
 
         self.message = format_track(self.track_index, self.track)
 
-        self.play_notes(self.last_chord)
+        self.play_notes()
 
-    def delete(self, back):
+    def delete(self, back, chord):
         if self.last_note is not None:
-            self.stop_notes([self.last_note])
-            if not back:
-                self.time += self.last_note.duration
-            last_duration = self.last_note.duration
-            self.song.remove_note(self.last_note)
-            self.last_chord.remove(self.last_note)
+            if chord:
+                self.stop_notes()
+            else:
+                self.stop_note(self.last_note)
+
+            if chord:
+                for note in self.last_chord:
+                    self.song.remove_note(note)
+                self.last_chord = []
+                self.last_note = None
+            else:
+                note_to_remove = self.last_note
+                if not self.cycle_notes():
+                    self.last_note = None
+                self.song.remove_note(note_to_remove)
+                self.last_chord.remove(note_to_remove)
+
+        if back:
             self.last_note = None
-            if back:
-                self.last_chord = self.song.get_previous_chord(self.time,
-                                                               self.track)
-                if len(self.last_chord) > 0:
-                    self.last_note = self.last_chord[0]
-                    self.time = self.last_note.time
-                else:
-                    self.time -= last_duration
-        elif back:
-            # TODO move to the previous chord like KEY_LEFT
-            # Consider deleting the entire chord with backspace
-            self.time = max(self.time - self.duration, 0)
+            self.last_chord = []
+            self.move_cursor(left=True)
 
     def create_track(self):
         track = self.song.create_track(instrument=self.instrument,
@@ -767,13 +785,13 @@ class Interface:
                 PLAY_EVENT.clear()
                 curses.cbreak()
             else:
-                self.stop_notes(self.last_chord)
+                self.stop_notes()
                 PLAY_EVENT.set()
                 curses.halfdelay(1)
 
     def restart_playback(self):
         if self.synth is not None:
-            self.stop_notes(self.last_chord)
+            self.stop_notes()
             RESTART_EVENT.set()
             PLAY_EVENT.set()
             curses.halfdelay(1)
@@ -784,6 +802,8 @@ class Interface:
             index += 1
             index %= len(self.last_chord)
             self.last_note = self.last_chord[index]
+            return True
+        return False
 
     def deselect(self):
         self.last_note = None
@@ -796,7 +816,7 @@ class Interface:
             else:
                 self.deselect()
         else:
-            self.stop_notes(self.last_chord)
+            self.stop_notes()
             self.insert = False
 
     def handle_action(self, action):
@@ -858,11 +878,13 @@ class Interface:
         elif action == Action.DESELECT_NOTES:
             self.deselect()
         elif action == Action.DELETE_NOTE:
-            self.delete(back=False)
+            self.delete(back=False, chord=False)
         elif action == Action.DELETE_CHORD:
-            self.delete(back=False)
+            self.delete(back=False, chord=True)
         elif action == Action.DELETE_NOTE_BACK:
-            self.delete(back=True)
+            self.delete(back=True, chord=False)
+        elif action == Action.DELETE_CHORD_BACK:
+            self.delete(back=True, chord=True)
         elif action == Action.TIME_NOTE_DEC:
             self.set_time(increase=False, chord=False)
         elif action == Action.TIME_NOTE_INC:
