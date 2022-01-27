@@ -3,18 +3,21 @@
 - Refactoring
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
 	- Remove strict dependencies, allow partial functionality in their absence
+	- Add a status item object
 - Editing
-	- Select all notes in a time range (visual mode)
+	- Select all notes in a time range (visual mode); one track by default, Shift for all tracks
 	- Delete/cut/copy/paste selected notes
 	- Transpose (just vertical movement)
 	- Undo/redo stack (general Result class with the ability to apply an undo, or just note undo/redo with a simpler class to add/remove/replace)
-	- Record a macro (just a list of actions)
-	- Set and jump to marks
+	- Record macro(s) (just a list of actions)
+	- Set and jump to mark(s)
 	- Chord insert mode: when a key is pressed, its natural chord in the current key/scale is inserted
 	- Word (chord) motion: jump to next chord regardless of distance, end of chord, start of previous chord
 	- Change a note/chord (delete and enter insert mode)
 	- Overwrite notes while inserting (replace mode)
 	- Merge one channel into another (need some way to choose or reorder tracks)
+	- Jump to measure number by typing the number and another key
+	- Prefix actions with a number to repeat them
 - Instruments
 	- Focus on specific instrument (hide and mute others)
 	- Display drum names on sidebar when editing drums
@@ -28,6 +31,8 @@
 - Music theory
 	- Basic chord identification in format_notes
 	- Better sharp/flat determination based on scale
+- Visualizer mode (command line argument): just play the song with no editing features and exit when done
 - MIDI port I/O
+- Real-time note durations in insert mode (recording mode)
 - Mouse support (if possible)
 - Documentation

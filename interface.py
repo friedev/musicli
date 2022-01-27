@@ -432,7 +432,6 @@ class Interface:
         end_measure = (self.song.ticks_to_beats(self.song.end) //
                        self.song.beats_per_measure +
                        1)
-
         if self.player is not None:
             play_measure = (self.song.ticks_to_beats(self.player.playhead) //
                             self.song.beats_per_measure +
@@ -445,6 +444,31 @@ class Interface:
                         self.song.beats_per_measure +
                         1)
         edit_text = (f' C{edit_measure}/{end_measure} ')
+        all_text = [mode_text,
+                    filename_text,
+                    key_scale_text,
+                    track_text,
+                    play_text,
+                    edit_text]
+        if sum([len(text) for text in all_text]) > self.width:
+            if len(self.filename) > 0:
+                all_text.remove(filename_text)
+                basename = self.filename[self.filename.rfind("/") + 1:]
+                filename_text = f' {basename} '
+                all_text.append(filename_text)
+            if sum([len(text) for text in all_text]) > self.width:
+                all_text.remove(track_text)
+                track_text = (f' T{self.track_index + 1}/'
+                              f'{len(self.song.tracks)} ')
+                all_text.append(track_text)
+            if sum([len(text) for text in all_text]) > self.width:
+                all_text.remove(mode_text)
+                mode_text = f' {mode_text[1]} '
+                all_text.append(mode_text)
+            if sum([len(text) for text in all_text]) > self.width:
+                all_text.remove(key_scale_text)
+                key_scale_text = f' {self.song.key_name} '
+                all_text.append(key_scale_text)
         attr = curses.color_pair(PAIR_STATUS_INSERT if self.insert else
                                  PAIR_STATUS_NORMAL)
         x = 0
@@ -458,13 +482,7 @@ class Interface:
         if x >= self.width:
             return
 
-        filler_width = (self.width -
-                        len(mode_text) -
-                        len(filename_text) -
-                        len(key_scale_text) -
-                        len(track_text) -
-                        len(play_text) -
-                        len(edit_text) - 1)
+        filler_width = self.width - sum([len(text) for text in all_text]) - 1
         if filler_width > 0:
             x = self.draw_status_item(x,
                                       ' ' * filler_width,
