@@ -43,6 +43,7 @@ PAIR_STATUS_NORMAL = len(INSTRUMENT_PAIRS) + 6
 PAIR_STATUS_INSERT = len(INSTRUMENT_PAIRS) + 7
 PAIR_LAST_NOTE = len(INSTRUMENT_PAIRS) + 8
 PAIR_LAST_CHORD = len(INSTRUMENT_PAIRS) + 9
+PAIR_HIGHLIGHT = len(INSTRUMENT_PAIRS) + 10
 
 DEFAULT_OCTAVE = 4
 
@@ -220,6 +221,8 @@ def init_color_pairs():
                      curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(PAIR_LAST_CHORD,
                      curses.COLOR_BLACK, COLOR_GRAY)
+    curses.init_pair(PAIR_HIGHLIGHT,
+                     curses.COLOR_BLACK, curses.COLOR_WHITE)
 
 
 def format_velocity(velocity):
@@ -255,6 +258,7 @@ class Interface:
         self.player = player
         self.filename = filename
         self.unicode = unicode
+        self.highlight_track = False
 
         init_color_pairs()
 
@@ -355,6 +359,8 @@ class Interface:
                 color_pair = PAIR_LAST_NOTE
             elif note.on_pair in self.last_chord:
                 color_pair = PAIR_LAST_CHORD
+            elif self.highlight_track and note.track is self.track:
+                color_pair = PAIR_HIGHLIGHT
             else:
                 if note.is_drum:
                     color_pair = PAIR_DRUM
@@ -691,6 +697,7 @@ class Interface:
         else:
             self.track_index -= 1
         self.track_index %= len(self.song.tracks)
+        self.highlight_track = True
 
         self.message = format_track(self.track_index, self.track)
 
@@ -752,6 +759,7 @@ class Interface:
         else:
             self.track_index = max(self.track_index - 1, 0)
             self.message = format_track(self.track_index, self.track)
+            self.highlight_track = True
 
     def toggle_playback(self):
         if self.synth is not None:
@@ -906,8 +914,9 @@ class Interface:
         if input_code == curses.ERR:
             return False
 
-        # Reset message on next actual keypress
+        # Reset temporary state upon an actual keypress
         self.message = ''
+        self.highlight_track = False
 
         if self.insert:
             if curses.ascii.isprint(input_code):

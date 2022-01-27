@@ -12,7 +12,6 @@
 	- Basic chord identification in format_notes
 	- Chord insert mode: when a key is pressed, its natural chord in the current key/scale is inserted
 - Instruments
-	- Temporarily highlight notes when switching channels
 	- Prompt/menu to select instrument
 	- Focus on specific instrument (hide and mute others)
 	- Display drum names on sidebar when editing drums
