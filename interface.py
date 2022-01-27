@@ -244,6 +244,57 @@ def format_track(index, track):
     return f'Track {index + 1}: {track.instrument_name}'
 
 
+class FillerBlock:
+    def __init__(self, attr=curses.A_NORMAL):
+        self.attr = attr
+        self.short = False
+
+    @property
+    def priority(self):
+        return inf
+
+    def __len__(self):
+        return 0
+
+    def __lt__(self, other):
+        return False
+
+    def __gt__(self, other):
+        return True
+
+
+class StatusBlock:
+    def __init__(self,
+                 string,
+                 short_string=None,
+                 attr=curses.A_NORMAL,
+                 priority=0,
+                 pad=True):
+        if short_string is None:
+            short_string = string
+        if pad:
+            self.string = ' ' + string + ' '
+            self.short_string = ' ' + short_string + ' '
+        else:
+            self.string = string
+            self.short_string = short_string
+        self.priority = priority
+        self.attr = attr
+        self.short = False
+
+    def __str__(self):
+        return self.short_string if self.short else self.string
+
+    def __len__(self):
+        return len(str(self))
+
+    def __lt__(self, other):
+        return self.priority < other.priority
+
+    def __gt__(self, other):
+        return self.priority > other.priority
+
+
 class Interface:
     def __init__(self, song, player=None, filename=None, unicode=True):
         self.song = song
@@ -410,12 +461,21 @@ class Interface:
                                    INSERT_KEYLIST[insert_key],
                                    pair_key)
 
-    def draw_status_item(self, x, string, attr):
-        self.window.addstr(self.height - 2,
-                           x,
-                           string[:self.width - x - 1],
-                           attr)
-        return x + len(string)
+    def draw_status_block(self, x, block, length):
+        if isinstance(block, FillerBlock):
+            filler_width = self.width - length - 1
+            string = ' ' * filler_width
+            new_x = x + filler_width
+        else:
+            string = str(block)[:self.width - x - 1]
+            new_x = x + len(block)
+
+        if len(string) > 0:
+            self.window.addstr(self.height - 2,
+                               x,
+                               string,
+                               block.attr)
+        return new_x
 
     def draw_status_bar(self):
         self.window.addstr(self.height - 1,
@@ -423,12 +483,43 @@ class Interface:
                            self.message.ljust(self.width - 1)[:self.width - 1],
                            curses.color_pair(0))
 
-        mode_text = f' {"INSERT" if self.insert else "NORMAL"} '
-        filename_text = f' {self.filename} ' if self.filename else ''
-        key_scale_text = (f' {self.song.key_name} '
-                          f'{self.song.scale_name.replace("_", " ")} ')
-        track_text = (f' T{self.track_index + 1}/{len(self.song.tracks)}: '
-                      f'{self.track.instrument_name} ')
+        bar = []
+
+        color = curses.color_pair(PAIR_STATUS_INSERT if self.insert else
+                                  PAIR_STATUS_NORMAL)
+
+        bar.append(StatusBlock(f'{"INSERT" if self.insert else "NORMAL"}',
+                               f'{"I" if self.insert else "N"}',
+                               attr=color | curses.A_BOLD,
+                               priority=2))
+
+        if self.filename:
+            filename_text = self.filename
+            basename_text = filename_text[filename_text.rfind("/") + 1:]
+        else:
+            filename_text = ''
+            basename_text = ''
+        bar.append(StatusBlock(filename_text,
+                               basename_text,
+                               attr=color | curses.A_BOLD | curses.A_REVERSE,
+                               priority=0))
+
+        bar.append(FillerBlock(attr=color | curses.A_REVERSE))
+
+        key_name = self.song.key_name
+        scale_name = self.song.scale_name.replace('_', ' ')
+        bar.append(StatusBlock(f'{key_name} {scale_name}',
+                               key_name,
+                               attr=color | curses.A_REVERSE,
+                               priority=3))
+
+        track_number_text = f'T{self.track_index + 1}/{len(self.song.tracks)}'
+        bar.append(StatusBlock(f'{track_number_text}: ' +
+                               self.track.instrument_name,
+                               track_number_text,
+                               attr=color | curses.A_NORMAL,
+                               priority=1))
+
         end_measure = (self.song.ticks_to_beats(self.song.end) //
                        self.song.beats_per_measure +
                        1)
@@ -436,75 +527,35 @@ class Interface:
             play_measure = (self.song.ticks_to_beats(self.player.playhead) //
                             self.song.beats_per_measure +
                             1)
-            play_text = (f' P{play_measure}/{end_measure} ')
+            play_text = f'P{play_measure}/{end_measure}'
         else:
             play_text = ''
+        bar.append(StatusBlock(play_text,
+                               attr=color | curses.A_BOLD,
+                               priority=4))
 
         edit_measure = (self.song.ticks_to_beats(self.time) //
                         self.song.beats_per_measure +
                         1)
-        edit_text = (f' C{edit_measure}/{end_measure} ')
-        all_text = [mode_text,
-                    filename_text,
-                    key_scale_text,
-                    track_text,
-                    play_text,
-                    edit_text]
-        if sum([len(text) for text in all_text]) > self.width:
-            if len(self.filename) > 0:
-                all_text.remove(filename_text)
-                basename = self.filename[self.filename.rfind("/") + 1:]
-                filename_text = f' {basename} '
-                all_text.append(filename_text)
-            if sum([len(text) for text in all_text]) > self.width:
-                all_text.remove(track_text)
-                track_text = (f' T{self.track_index + 1}/'
-                              f'{len(self.song.tracks)} ')
-                all_text.append(track_text)
-            if sum([len(text) for text in all_text]) > self.width:
-                all_text.remove(mode_text)
-                mode_text = f' {mode_text[1]} '
-                all_text.append(mode_text)
-            if sum([len(text) for text in all_text]) > self.width:
-                all_text.remove(key_scale_text)
-                key_scale_text = f' {self.song.key_name} '
-                all_text.append(key_scale_text)
-        attr = curses.color_pair(PAIR_STATUS_INSERT if self.insert else
-                                 PAIR_STATUS_NORMAL)
+        bar.append(StatusBlock(f'C{edit_measure}/{end_measure}',
+                               attr=color | curses.A_BOLD,
+                               priority=5))
+
+        length = sum([len(block) for block in bar])
+        if length >= self.width:
+            priority_order = sorted(bar)
+            for block in priority_order:
+                length -= len(block)
+                block.short = True
+                length += len(block)
+                if length < self.width:
+                    break
+
         x = 0
-        x = self.draw_status_item(x, mode_text, attr | curses.A_BOLD)
-        if x >= self.width:
-            return
-
-        x = self.draw_status_item(x,
-                                  filename_text,
-                                  attr | curses.A_REVERSE | curses.A_BOLD)
-        if x >= self.width:
-            return
-
-        filler_width = self.width - sum([len(text) for text in all_text]) - 1
-        if filler_width > 0:
-            x = self.draw_status_item(x,
-                                      ' ' * filler_width,
-                                      attr | curses.A_REVERSE)
-
-        x = self.draw_status_item(x,
-                                  key_scale_text,
-                                  attr | curses.A_REVERSE)
-        if x >= self.width:
-            return
-
-        x = self.draw_status_item(x,
-                                  track_text,
-                                  attr)
-        if x >= self.width:
-            return
-
-        x = self.draw_status_item(x, play_text, attr | curses.A_BOLD)
-        if x >= self.width:
-            return
-
-        x = self.draw_status_item(x, edit_text, attr | curses.A_BOLD)
+        for block in bar:
+            x = self.draw_status_block(x, block, length)
+            if x >= self.width:
+                return
 
     def draw(self):
         self.draw_scale_dots()

@@ -3,7 +3,6 @@
 - Refactoring
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
 	- Remove strict dependencies, allow partial functionality in their absence
-	- Add a status item object
 - Editing
 	- Select all notes in a time range (visual mode); one track by default, Shift for all tracks
 	- Delete/cut/copy/paste selected notes
