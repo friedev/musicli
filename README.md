@@ -67,8 +67,8 @@ Further left is the key you can type to enter that note while in insert mode (mo
 The dots on some rows correspond to the notes in the current key and scale you are using.
 By default, this is C Major, but you can change it with the `--key` and `--scale` arguments.
 
-Each character column represents a subdivision of a beat (what MusiCLI internally refers to as a "unit").
-By default, this is a 16th note, but this can be customized with the `--units-per-beat` argument.
+Each character column represents a subdivision of a beat.
+By default, this is a 16th note, but this can be customized with the `--cols-per-beat` argument.
 Each beat is marked with a dot, and each measure is marked with a line.
 The length of each measure can be customized with `--beats-per-measure` flag.
 

@@ -1,15 +1,15 @@
 # TODO
 
 - Refactoring
-	- Save all messages including control changes (e.g. volume) as non-note events in the song (uneditable for now)
+	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
 - Editing
+	- Tab to cycle notes in chord
 	- Automatically select previous chord when backspacing
 	- Select all notes in a time range (visual mode)
 	- Delete/cut/copy/paste selected notes
 	- Transpose
 	- Undo/redo stack
 	- Keybind to sync playhead to cursor and vice versa
-	- Horizontal zoom: change units per beat in-editor (i/o in normal mode)
 	- Basic chord identification in format_notes
 	- Chord insert mode: when a key is pressed, its natural chord in the current key/scale is inserted
 - Instruments
@@ -19,6 +19,10 @@
 	- Display drum names on sidebar when editing drums
 	- Separate drum window with a custom set of drums to use?
 	- Color notes based on their instrument's category (piano, brass, etc.)
+- In-editor functionality
+	- Change song properties (e.g. tempo, cols per beat, etc.)
+	- Save to interactively specified file
+	- Open interactively specified file 
 - Track notes currently being played, and stop them when playback is paused
 - Better sharp/flat determination based on scale
 - MIDI port I/O
