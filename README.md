@@ -34,7 +34,7 @@ I recommend the MuseScore General Soundfont, which can be freely downloaded from
 
 To run MusiCLI from the root directory of the repo, run:
 ```sh
-./musicli.py file.mid -f soundfont.sf2
+./musicli.py file.mid -soundfont=soundfont.sf2
 ```
 
 Providing a MIDI file to open is optional.
@@ -43,18 +43,19 @@ You may also provide no file; if you choose to save later, it will be saved as `
 
 If you wish to import a MIDI file, but save changes to another file, use the `--import` or `-i` option:
 ```sh
-./musicli.py file_to_export.mid -i file_to_import.mid -f soundfont.sf2
+./musicli.py file_to_export.mid --import=file_to_import.mid --soundfont=soundfont.sf2
 ```
 
-Providing a soundfont is also optional, but live playback will be unavailable unless you do.
+Providing a soundfont with `--soundfont` or `-f` is also optional, but live playback will be unavailable unless you do.
 If no soundfont is provided, MusiCLI will look for one at `/usr/share/soundfonts/default.sf2`, which is FluidSynth's default location.
 
 Much more song-specific information can be customized via other command line arguments. View a full list by running:
 ```sh
-./musicli.py -h
+./musicli.py --help
 ```
+### Keybindings
 
-**For a list of keybindings, run:**
+**For a full list of editor keybindings, run:**
 ```sh
 ./musicli.py --keymap
 ```
