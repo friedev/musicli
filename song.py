@@ -572,9 +572,7 @@ class Song:
         if midi_file is not None:
             self.import_midi(midi_file, synth, soundfont)
         else:
-            new_track = Track(0)
-            new_track.set_instrument(DEFAULT_INSTRUMENT, synth, soundfont)
-            self.tracks.append(new_track)
+            self.create_track(synth=synth, soundfont=soundfont)
 
         if self.tempo is None:
             self.tempo = DEFAULT_TEMPO
@@ -656,9 +654,7 @@ class Song:
 
     def get_index(self, time, track=None, on=False):
         index = bisect_left(self, DummyNote(time))
-        if time < self[index].time:
-            return -1
-        if time > self[index].time:
+        if not 0 <= index < len(self) or time != self[index].time:
             return len(self)
         while (index < len(self) and
                self[index].time == time and
@@ -669,8 +665,8 @@ class Song:
 
     def get_previous_index(self, time, track=None, on=False):
         index = bisect_left(self, DummyNote(time))
-        if time < self[index].time:
-            return -1
+        if not 0 <= index < len(self) or time < self[index].time:
+            return len(self)
         index -= 1
         while (index >= 0 and
                ((track is not None and self[index].track is not track) or
@@ -683,7 +679,7 @@ class Song:
             index = bisect_left(self, DummyNote(time))
         else:
             index = bisect_right(self, DummyNote(time))
-        if index < len(self) and time > self[index].time:
+        if not 0 <= index < len(self) or time > self[index].time:
             return len(self)
         while (index < len(self) and
                ((track is not None and self[index].track is not track) or
@@ -720,7 +716,7 @@ class Song:
 
     def get_previous_chord(self, time, track=None):
         index = self.get_previous_index(time, track, on=True)
-        if index < 0:
+        if not 0 <= index < len(self):
             return []
         chord_time = self[index].time
         chord = [self[index]]
@@ -734,7 +730,7 @@ class Song:
 
     def get_next_chord(self, time, track=None, inclusive=True):
         index = self.get_next_index(time, track, on=True, inclusive=inclusive)
-        if index >= len(self):
+        if not 0 <= index < len(self):
             return []
         chord_time = self[index].time
         chord = [self[index]]
@@ -759,16 +755,44 @@ class Song:
                 return True
         return False
 
-    def get_track(self, channel, create=True, synth=None, soundfont=None):
+    def create_track(self,
+                     channel=None,
+                     instrument=DEFAULT_INSTRUMENT,
+                     synth=None,
+                     soundfont=None):
+        if channel is None:
+            channels = set()
+            for track in self.tracks:
+                channels.add(track.channel)
+            channel = 0
+            while channel in channels:
+                channel += 1
+        track = Track(channel)
+        track.set_instrument(instrument, synth, soundfont)
+        self.tracks.append(track)
+        return track
+
+    def get_track(self,
+                  channel,
+                  create=True,
+                  instrument=DEFAULT_INSTRUMENT,
+                  synth=None,
+                  soundfont=None):
         for track in self.tracks:
             if track.channel == channel:
                 return track
         if create:
-            track = Track(channel)
-            track.set_instrument(DEFAULT_INSTRUMENT, synth, soundfont)
-            self.tracks.append(track)
-            return track
+            return self.create_track(channel, instrument, synth, soundfont)
         return None
+
+    def delete_track(self, track):
+        i = 0
+        while i < len(self.notes):
+            if self[i].track is track:
+                self.notes.pop(i)
+            else:
+                i += 1
+        self.tracks.remove(track)
 
     def import_midi(self, infile_path, synth=None, soundfont=None):
         infile = MidiFile(infile_path)

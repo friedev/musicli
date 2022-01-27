@@ -88,6 +88,10 @@ class Action(Enum):
     TRACK_INC = 'switch to the next track'
     INSTRUMENT_DEC = 'use the previous instrument on this channel'
     INSTRUMENT_INC = 'use the next instrument on this channel'
+    CYCLE_NOTES = 'cycle through notes in the selected chord'
+    DESELECT_NOTES = 'deselect all notes'
+    TRACK_CREATE = 'create a new track'
+    TRACK_DELETE = 'delete the current track'
     PLAYBACK_TOGGLE = 'toggle playback (play/pause)'
     PLAYBACK_RESTART = 'restart playback from the beginning of the song'
     WRITE_MIDI = 'export song as a MIDI file'
@@ -122,6 +126,8 @@ KEYMAP = {
     curses.KEY_IC: Action.MODE_INSERT,
     ord('x'): Action.DELETE_NOTE,
     ord('d'): Action.DELETE_CHORD,
+    curses.ascii.TAB: Action.CYCLE_NOTES,
+    ord('`'): Action.DESELECT_NOTES,
     curses.KEY_DC: Action.DELETE_NOTE,
     curses.KEY_BACKSPACE: Action.DELETE_NOTE_BACK,
     ord(','): Action.TIME_NOTE_DEC,
@@ -140,6 +146,8 @@ KEYMAP = {
     ord('='): Action.TRACK_INC,
     ord('_'): Action.INSTRUMENT_DEC,
     ord('+'): Action.INSTRUMENT_INC,
+    ord('o'): Action.TRACK_CREATE,
+    ord('D'): Action.TRACK_DELETE,
     ord(' '): Action.PLAYBACK_TOGGLE,
     curses.ascii.LF: Action.PLAYBACK_RESTART,
     ord('w'): Action.WRITE_MIDI,
@@ -265,6 +273,10 @@ class Interface:
     @property
     def track(self):
         return self.song.tracks[self.track_index]
+
+    @property
+    def instrument(self):
+        return self.track.instrument
 
     @property
     def synth(self):
@@ -397,7 +409,7 @@ class Interface:
         filename_text = f' {self.filename} ' if self.filename else ''
         key_scale_text = (f' {self.song.key_name} '
                           f'{self.song.scale_name.replace("_", " ")} ')
-        track_text = f' {self.track_index}: {self.track.instrument_name} '
+        track_text = f' {self.track_index + 1}: {self.track.instrument_name} '
         end_measure = (self.song.ticks_to_beats(self.song.end) //
                        self.song.beats_per_measure +
                        1)
@@ -720,6 +732,27 @@ class Interface:
             # Consider deleting the entire chord with backspace
             self.time = max(self.time - self.duration, 0)
 
+    def create_track(self):
+        track = self.song.create_track(instrument=self.instrument,
+                                       synth=self.synth,
+                                       soundfont=self.soundfont)
+        self.track_index = self.song.tracks.index(track)
+        self.message = format_track(self.track_index, self.track)
+
+    def delete_track(self):
+        self.deselect()
+        instrument = self.instrument
+        self.song.delete_track(self.track)
+        if len(self.song.tracks) == 0:
+            self.song.create_track(instrument=instrument,
+                                   synth=self.synth,
+                                   soundfont=self.soundfont)
+            self.track_index = 0
+            self.message = f'Track {self.track_index + 1} cleared'
+        else:
+            self.track_index = max(self.track_index - 1, 0)
+            self.message = format_track(self.track_index, self.track)
+
     def toggle_playback(self):
         if self.synth is not None:
             if PLAY_EVENT.is_set():
@@ -736,6 +769,13 @@ class Interface:
             RESTART_EVENT.set()
             PLAY_EVENT.set()
             curses.halfdelay(1)
+
+    def cycle_notes(self):
+        if len(self.last_chord) >= 2:
+            index = self.last_chord.index(self.last_note)
+            index += 1
+            index %= len(self.last_chord)
+            self.last_note = self.last_chord[index]
 
     def deselect(self):
         self.last_note = None
@@ -805,6 +845,10 @@ class Interface:
             self.insert = True
             self.time = self.song.end
             self.snap_to_time()
+        elif action == Action.CYCLE_NOTES:
+            self.cycle_notes()
+        elif action == Action.DESELECT_NOTES:
+            self.deselect()
         elif action == Action.DELETE_NOTE:
             self.delete(back=False)
         elif action == Action.DELETE_CHORD:
@@ -843,6 +887,10 @@ class Interface:
             self.set_instrument(increase=False)
         elif action == Action.INSTRUMENT_INC:
             self.set_instrument(increase=True)
+        elif action == Action.TRACK_CREATE:
+            self.create_track()
+        elif action == Action.TRACK_DELETE:
+            self.delete_track()
         elif action == Action.PLAYBACK_TOGGLE:
             self.toggle_playback()
         elif action == Action.PLAYBACK_RESTART:
@@ -855,9 +903,11 @@ class Interface:
             self.message = 'Press Ctrl+C to exit MusiCLI'
 
     def handle_input(self, input_code):
+        if input_code == curses.ERR:
+            return False
+
         # Reset message on next actual keypress
-        if input_code != curses.ERR:
-            self.message = ''
+        self.message = ''
 
         if self.insert:
             if curses.ascii.isprint(input_code):
@@ -868,7 +918,7 @@ class Interface:
                     self.insert_note(number, chord)
                     return True
                 if input_char.isalnum() or input_char in SHIFT_NUMBERS:
-                    self.message = "Key '{input_char}' does not map to a note"
+                    self.message = f'Key "{input_char}" does not map to a note'
                     return False
         action = KEYMAP.get(input_code)
         if action is not None:

@@ -33,8 +33,6 @@ from song import (Song,
                   DEFAULT_BEATS_PER_MEASURE,
                   DEFAULT_COLS_PER_BEAT,
                   DEFAULT_KEY,
-                  DEFAULT_TEMPO,
-                  DEFAULT_VELOCITY,
                   NAME_TO_NUMBER,
                   SCALE_NAME_MAP)
 from playback import Player, PLAY_EVENT, KILL_EVENT
@@ -62,6 +60,7 @@ CURSES_KEY_NAMES = {
     curses.KEY_IC: 'Insert',
     curses.KEY_DC: 'Delete',
     curses.KEY_BACKSPACE: 'Backspace',
+    curses.ascii.TAB: 'Tab',
     curses.ascii.LF: 'Enter',
     curses.ascii.ESC: 'Escape',
 }

@@ -3,7 +3,6 @@
 - Refactoring
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
 - Editing
-	- Tab to cycle notes in chord
 	- Automatically select previous chord when backspacing
 	- Select all notes in a time range (visual mode)
 	- Delete/cut/copy/paste selected notes

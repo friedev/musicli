@@ -106,6 +106,11 @@ Pressing Shift along with the vi keys will cause you to pan a shorter distance.
 Many operations will affect the last note or chord you inserted.
 These notes are highlighted in white and gray respectively.
 
+## Troubleshooting
+
+If MusiCLI crashes, it should create a `crash.log` file (or whatever file you have configured with `--crash-file`).
+If this happens, please submit an issue on GitHub with the contents of this file, and a description of what you were doing right before the crash happened.
+
 ## Contributing
 
 MusiCLI is a small project initially developed during a hackathon, so be warned that it is not fully polished and documented yet.
