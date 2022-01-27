@@ -7,7 +7,6 @@
 	- Delete/cut/copy/paste selected notes
 	- Transpose
 	- Undo/redo stack
-	- Keybind to sync playhead to cursor and vice versa
 	- Basic chord identification in format_notes
 	- Chord insert mode: when a key is pressed, its natural chord in the current key/scale is inserted
 - Instruments

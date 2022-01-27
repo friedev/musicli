@@ -96,6 +96,8 @@ class Action(Enum):
     TRACK_DELETE = 'delete the current track'
     PLAYBACK_TOGGLE = 'toggle playback (play/pause)'
     PLAYBACK_RESTART = 'restart playback from the beginning of the song'
+    PLAYBACK_CURSOR = 'restart playback from the editing cursor'
+    CURSOR_TO_PLAYHEAD = 'sync the cursor location to the playhead'
     WRITE_MIDI = 'export song as a MIDI file'
     QUIT_HELP = 'does not quit; use Ctrl+C to exit MusiCLI'
 
@@ -156,6 +158,8 @@ KEYMAP = {
     ord('T'): Action.TRACK_DELETE,
     ord(' '): Action.PLAYBACK_TOGGLE,
     curses.ascii.LF: Action.PLAYBACK_RESTART,
+    ord('g'): Action.PLAYBACK_CURSOR,
+    ord('G'): Action.CURSOR_TO_PLAYHEAD,
     ord('w'): Action.WRITE_MIDI,
     ord('W'): Action.WRITE_MIDI,
     ord('q'): Action.QUIT_HELP,
@@ -780,7 +784,7 @@ class Interface:
             self.highlight_track = True
 
     def toggle_playback(self):
-        if self.synth is not None:
+        if self.player is not None:
             if PLAY_EVENT.is_set():
                 PLAY_EVENT.clear()
                 curses.cbreak()
@@ -789,9 +793,10 @@ class Interface:
                 PLAY_EVENT.set()
                 curses.halfdelay(1)
 
-    def restart_playback(self):
-        if self.synth is not None:
+    def restart_playback(self, restart_time=0):
+        if self.player is not None:
             self.stop_notes()
+            self.player.restart_time = restart_time
             RESTART_EVENT.set()
             PLAY_EVENT.set()
             curses.halfdelay(1)
@@ -925,6 +930,12 @@ class Interface:
             self.toggle_playback()
         elif action == Action.PLAYBACK_RESTART:
             self.restart_playback()
+        elif action == Action.PLAYBACK_CURSOR:
+            self.restart_playback(self.time)
+        elif action == Action.CURSOR_TO_PLAYHEAD:
+            if self.player is not None:
+                self.time = self.player.playhead
+                self.snap_to_time()
         elif action == Action.WRITE_MIDI:
             if self.filename is not None:
                 self.song.export_midi(self.filename)

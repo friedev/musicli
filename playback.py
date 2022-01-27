@@ -29,6 +29,7 @@ class Player:
         self.synth = synth
         self.soundfont = soundfont
         self.playhead = 0
+        self.restart_time = 0
 
     @property
     def playing(self):
@@ -56,9 +57,11 @@ class Player:
                 PLAY_EVENT.clear()
                 continue
 
-            note_index = 0
-            self.playhead = 0
-            next_unit_time = song.cols_to_ticks(1)
+            self.playhead = self.restart_time
+            next_unit_time = (self.playhead -
+                              (self.playhead % song.cols_to_ticks(1)) +
+                              song.cols_to_ticks(1))
+            note_index = song.get_next_index(self.playhead, inclusive=True)
             next_note = song[note_index]
             active_notes = []
             while note_index < len(song):
@@ -88,7 +91,7 @@ class Player:
                        self.playhead == next_note.time):
                     if next_note.on:
                         active_notes.append(next_note)
-                    else:
+                    elif next_note.pair in active_notes:
                         active_notes.remove(next_note.pair)
                     self.play_note(next_note)
                     note_index += 1
