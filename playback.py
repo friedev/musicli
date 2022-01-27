@@ -39,7 +39,7 @@ class Player:
 
     def play_note(self, note):
         if note.on:
-            self.synth.noteon(note.channel, note.number, note.velocity)
+            self.synth.noteon(note.channel, note.number, note.net_velocity)
         else:
             self.stop_note(note)
 
@@ -60,6 +60,7 @@ class Player:
             self.playhead = 0
             next_unit_time = song.cols_to_ticks(1)
             next_note = song[note_index]
+            active_notes = []
             while note_index < len(song):
                 delta = min(next_unit_time, next_note.time) - self.playhead
                 sleep(delta /
@@ -74,7 +75,10 @@ class Player:
                     note_index = song.get_next_index(self.playhead)
                     next_note = song[note_index]
 
-                PLAY_EVENT.wait()
+                if not PLAY_EVENT.is_set():
+                    for note in active_notes:
+                        self.stop_note(note)
+                    PLAY_EVENT.wait()
                 if RESTART_EVENT.is_set():
                     break
                 if KILL_EVENT.is_set():
@@ -82,7 +86,14 @@ class Player:
 
                 while (note_index < len(song) and
                        self.playhead == next_note.time):
+                    if next_note.on:
+                        active_notes.append(next_note)
+                    else:
+                        active_notes.remove(next_note.pair)
                     self.play_note(next_note)
                     note_index += 1
                     if note_index < len(song):
                         next_note = song[note_index]
+
+            for note in active_notes:
+                self.stop_note(note)

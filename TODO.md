@@ -18,8 +18,8 @@
 - In-editor functionality
 	- Change song properties (e.g. tempo, cols per beat, etc.)
 	- Save to interactively specified file
-	- Open interactively specified file 
-- Track notes currently being played, and stop them when playback is paused
+	- Open interactively specified file
+	- Change channel volume
 - Better sharp/flat determination based on scale
 - MIDI port I/O
 - Mouse support (if possible)

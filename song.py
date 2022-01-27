@@ -30,7 +30,7 @@ NOTES_PER_OCTAVE = 12
 MAX_VELOCITY = 127
 DEFAULT_VELOCITY = MAX_VELOCITY  # 64 is recommended, but seems quiet
 
-TOTAL_INSTRUMENTS = 128  # Drums replace gunshot as instrument 128
+TOTAL_INSTRUMENTS = 128
 DEFAULT_CHANNEL = 0
 DEFAULT_BANK = 0
 
@@ -38,6 +38,10 @@ DRUM_CHANNEL = 9
 DRUM_BANK = 128
 DRUM_INSTRUMENT = 0
 DRUM_OFFSET = 35
+
+MAX_VOLUME = 127
+DEFAULT_VOLUME = MAX_VOLUME
+VOLUME_CONTROL = 7
 
 NAME_TO_NUMBER = {
     'C':  0,
@@ -319,13 +323,18 @@ def name_to_number(name):
 
 
 class Track:
-    def __init__(self, channel):
+    def __init__(self, channel, volume=DEFAULT_VOLUME):
         self.channel = channel
         self.instrument = None
+        self.volume = volume
 
     @property
     def is_drum(self):
         return self.channel == DRUM_CHANNEL
+
+    @property
+    def velocity_mod(self):
+        return self.volume / MAX_VOLUME
 
     @property
     def instrument_name(self):
@@ -436,6 +445,10 @@ class Note:
         if self.is_drum:
             return str(self.number)
         return number_to_name(self.number, key, octave=octave)
+
+    @property
+    def net_velocity(self):
+        return int(self.velocity * self.track.velocity_mod)
 
     @property
     def channel(self):
@@ -831,6 +844,9 @@ class Song:
                             message.program,
                             synth,
                             soundfont)
+                elif message.type == 'control_change':
+                    if message.control == VOLUME_CONTROL:
+                        self.get_track(message.channel).volume = message.value
                 elif message.type == 'set_tempo':
                     if self.tempo is None:
                         self.tempo = message.tempo
@@ -847,8 +863,12 @@ class Song:
                 midi_track.append(MetaMessage('set_tempo', tempo=self.tempo))
                 tempo_set = True
             midi_track.append(Message('program_change',
-                                      program=track.instrument,
-                                      channel=track.channel))
+                                      channel=track.channel,
+                                      program=track.instrument))
+            midi_track.append(Message('control_change',
+                                      channel=track.channel,
+                                      control=VOLUME_CONTROL,
+                                      value=track.volume))
             for message in notes_to_messages(notes):
                 midi_track.append(message)
             outfile.tracks.append(midi_track)
