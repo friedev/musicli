@@ -53,6 +53,11 @@ Much more song-specific information can be customized via other command line arg
 ./musicli.py -h
 ```
 
+**For a list of keybindings, run:**
+```sh
+./musicli.py --keymap
+```
+
 ### Interface
 
 Unlike the original tracker interface of MusiCLI 1.0, MusiCLI 2.0 provides a piano roll editor that should be familiar to users of modern DAWs.
@@ -100,52 +105,6 @@ Pressing Shift along with the vi keys will cause you to pan a shorter distance.
 
 Many operations will affect the last note or chord you inserted.
 These notes are highlighted in white and gray respectively.
-
-### Keybindings
-
-#### All Modes
-
-- Page Up/Down: Jump to the highest/lowest note.
-- Home/End: Jump to the beginning/end of the song.
-- `$`: Jump to the end of the song.
-- Up/Down: Edit one octave above/below your current range.
-- Left/Right: Edit one step forward or backward in time.
-  The number of beats you will travel is equal to the duration of the last note inserted.
-- Backspace/Delete: Delete the last note entered.
-  Currently only works for the very last note, and none before it.
-- `[`/`]`: Adjust the duration of the last note entered by one unit.
-  Holding Shift will affect the last chord.
-- `,`/`.`: Adjust the beat of the last note entered by one unit.
-  Holding Shift will affect the last chord.
-- `;`/`'`: Adjust the velocity of current note by 1.
-  Holding Shift will affect the last chord.
-- `-`/`=`: Switch to the previous or next track.
-- `_`/`+`: Set this track to use the next or previous instrument.
-- Space: Play, pause, or resume music playback, if a soundfont was provided with `-f` or `--soundfont`.
-- Enter: Restart from the beginning of the song.
-- `Ctrl+C`: Exit MusiCLI.
-
-#### Normal Mode
-
-- `hjkl`: Pan the view. Holding Shift will cause you to pan in smaller steps.
-- `0`/`^`: Jump to the beginning of the song.
-- `$`: Jump to the end of the song.
-- `w`: Export the song as a MIDI file.
-  **If you opened an existing file (using the `file` parameter), it will be overwritten.**
-  Files imported with the `--import` argument will be unaffected.
-  If you did not import a file but did specify a path, it will be saved to that path.
-  If you did not specify a path, the file will be saved as `untitled.mid`.
-- `i`: Enter insert mode.
-- `a`: Enter insert mode and advance one step.
-- `I`: Enter insert mode and jump to the beginning of the song.
-- `A`: Enter insert mode and jump to the end of the song.
-- Escape: Deselect notes.
-
-#### Insert Mode
-
-- All letters and numbers: Insert a note of the corresponding pitch at the current cursor position.
-  Refer to the labels on the left sidebar for this correspondence.
-- Escape: Return to normal mode.
 
 ## Contributing
 
