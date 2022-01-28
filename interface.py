@@ -47,6 +47,10 @@ PAIR_HIGHLIGHT = len(INSTRUMENT_PAIRS) + 10
 
 DEFAULT_OCTAVE = 4
 
+ERROR_FLUIDSYNTH = ('fluidsynth could not be imported, so playback is '
+                    'unavailable')
+ERROR_MIDO = 'mido could not be imported, so MIDI import/export is unavailable'
+
 
 class Action(Enum):
     PAN_LEFT = 'pan left'
@@ -344,14 +348,6 @@ class Interface:
     @property
     def instrument(self):
         return self.track.instrument
-
-    @property
-    def synth(self):
-        return self.player.synth if self.player is not None else None
-
-    @property
-    def soundfont(self):
-        return self.player.soundfont if self.player is not None else None
 
     def init_window(self, window):
         self.window = window
@@ -801,7 +797,7 @@ class Interface:
             instrument -= 1
         instrument %= TOTAL_INSTRUMENTS
 
-        self.track.set_instrument(instrument, self.synth, self.soundfont)
+        self.track.set_instrument(instrument, self.player)
 
         self.message = format_track(self.track_index, self.track)
 
@@ -833,8 +829,7 @@ class Interface:
 
     def create_track(self):
         track = self.song.create_track(instrument=self.instrument,
-                                       synth=self.synth,
-                                       soundfont=self.soundfont)
+                                       player=self.player)
         self.track_index = self.song.tracks.index(track)
         self.message = format_track(self.track_index, self.track)
 
@@ -844,8 +839,7 @@ class Interface:
         self.song.delete_track(self.track)
         if len(self.song.tracks) == 0:
             self.song.create_track(instrument=instrument,
-                                   synth=self.synth,
-                                   soundfont=self.soundfont)
+                                   player=self.player)
             self.track_index = 0
             self.message = f'Track {self.track_index + 1} cleared'
         else:
@@ -854,22 +848,43 @@ class Interface:
             self.highlight_track = True
 
     def toggle_playback(self):
-        if self.player is not None:
-            if PLAY_EVENT.is_set():
-                PLAY_EVENT.clear()
-                curses.cbreak()
-            else:
-                self.stop_notes()
-                PLAY_EVENT.set()
-                curses.halfdelay(1)
+        if self.player is None:
+            self.message = ERROR_FLUIDSYNTH
+            return
 
-    def restart_playback(self, restart_time=0):
-        if self.player is not None:
+        if PLAY_EVENT.is_set():
+            PLAY_EVENT.clear()
+            curses.cbreak()
+        else:
             self.stop_notes()
-            self.player.restart_time = restart_time
-            RESTART_EVENT.set()
             PLAY_EVENT.set()
             curses.halfdelay(1)
+
+    def restart_playback(self, restart_time=0):
+        if self.player is None:
+            self.message = ERROR_FLUIDSYNTH
+            return
+
+        self.stop_notes()
+        self.player.restart_time = restart_time
+        RESTART_EVENT.set()
+        PLAY_EVENT.set()
+        curses.halfdelay(1)
+
+    def cursor_to_playhead(self):
+        if self.player is None:
+            self.message = ()
+            return
+        self.time = self.player.playhead
+        self.snap_to_time()
+
+    def export_midi(self):
+        if self.filename is None:
+            self.message = ERROR_MIDO
+            return
+
+        self.song.export_midi(self.filename)
+        self.message = f'Wrote MIDI to {self.filename}'
 
     def cycle_notes(self):
         if len(self.last_chord) >= 2:
@@ -1003,13 +1018,9 @@ class Interface:
         elif action == Action.PLAYBACK_CURSOR:
             self.restart_playback(self.time)
         elif action == Action.CURSOR_TO_PLAYHEAD:
-            if self.player is not None:
-                self.time = self.player.playhead
-                self.snap_to_time()
+            self.cursor_to_playhead()
         elif action == Action.WRITE_MIDI:
-            if self.filename is not None:
-                self.song.export_midi(self.filename)
-                self.message = f'Wrote MIDI to {self.filename}'
+            self.export_midi()
         elif action == Action.QUIT_HELP:
             self.message = 'Press Ctrl+C to exit MusiCLI'
 

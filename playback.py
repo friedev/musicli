@@ -18,6 +18,12 @@ import sys
 from threading import Event
 from time import sleep
 
+try:
+    from fluidsynth import Synth
+    IMPORT_FLUIDSYNTH = True
+except ImportError:
+    IMPORT_FLUIDSYNTH = False
+
 # Global thread events
 PLAY_EVENT = Event()
 RESTART_EVENT = Event()
@@ -25,9 +31,11 @@ KILL_EVENT = Event()
 
 
 class Player:
-    def __init__(self, synth, soundfont):
-        self.synth = synth
-        self.soundfont = soundfont
+    def __init__(self, soundfont):
+        self.synth = Synth()
+        self.synth.start()
+        self.soundfont = self.synth.sfload(soundfont)
+
         self.playhead = 0
         self.restart_time = 0
 
@@ -43,6 +51,9 @@ class Player:
             self.synth.noteon(note.channel, note.number, note.net_velocity)
         else:
             self.stop_note(note)
+
+    def set_instrument(self, channel, bank, instrument):
+        self.synth.program_select(channel, self.soundfont, bank, instrument)
 
     def play_song(self, song):
         while True:
@@ -66,10 +77,7 @@ class Player:
             active_notes = []
             while note_index < len(song):
                 delta = min(next_unit_time, next_note.time) - self.playhead
-                sleep(delta /
-                      song.ticks_per_beat /
-                      song.bpm *
-                      60.0)
+                sleep(delta / song.ticks_per_beat / song.bpm * 60.0)
 
                 self.playhead += delta
 

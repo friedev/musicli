@@ -16,13 +16,13 @@ The tag `v2.0.0` marks the state of MusiCLI at the end of the hackathon.
 
 - Python 3
 - curses
-- [mido](https://github.com/mido/mido)
-- [FluidSynth](https://fluidsynth.org)
-- [PyFluidSynth](https://github.com/nwhitehead/pyfluidsynth)
+- [mido](https://github.com/mido/mido) (optional; required for MIDI import/export)
+- [FluidSynth](https://fluidsynth.org) (optional; required for playback)
+- [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth) (optional; required for playback)
 
 For directions on installing FluidSynth for your platform, refer to [Getting FluidSynth](https://www.fluidsynth.org/download/).
 
-To install the required Python dependencies, run:
+Then, to install the required Python dependencies, run:
 ```sh
 pip3 install -r requirements.txt
 ```

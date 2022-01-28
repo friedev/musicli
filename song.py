@@ -16,12 +16,16 @@
 
 from bisect import bisect_left, bisect_right, insort
 
-from mido import (Message,
-                  MetaMessage,
-                  MidiFile,
-                  MidiTrack,
-                  tempo2bpm)
-from mido.midifiles.midifiles import DEFAULT_TEMPO, DEFAULT_TICKS_PER_BEAT
+try:
+    from mido import (Message,
+                      MetaMessage,
+                      MidiFile,
+                      MidiTrack,
+                      bpm2tempo,
+                      tempo2bpm)
+    IMPORT_MIDO = True
+except ImportError:
+    IMPORT_MIDO = False
 
 
 TOTAL_NOTES = 127
@@ -284,6 +288,10 @@ DRUM_NAMES = [
 ]
 
 DEFAULT_COLS_PER_BEAT = 4
+# These correspond to mido's DEFAULT_TEMPO and DEFAULT_TICKS_PER_BEAT
+# Manually specified to reduce dependency
+DEFAULT_BPM = 120
+DEFAULT_TICKS_PER_BEAT = 480
 DEFAULT_BEATS_PER_MEASURE = 4
 DEFAULT_INSTRUMENT = 0
 DEFAULT_KEY = 0
@@ -333,6 +341,10 @@ class Track:
         return self.channel == DRUM_CHANNEL
 
     @property
+    def bank(self):
+        return DRUM_BANK if self.is_drum else DEFAULT_BANK
+
+    @property
     def velocity_mod(self):
         return self.volume / MAX_VOLUME
 
@@ -342,19 +354,10 @@ class Track:
             return 'Drums'
         return INSTRUMENT_NAMES[self.instrument]
 
-    def set_instrument(self, instrument, synth=None, soundfont=None):
+    def set_instrument(self, instrument, player=None):
         self.instrument = instrument
-        if synth is not None and soundfont is not None:
-            if self.is_drum:
-                synth.program_select(self.channel,
-                                     soundfont,
-                                     DRUM_BANK,
-                                     instrument)
-            else:
-                synth.program_select(self.channel,
-                                     soundfont,
-                                     DEFAULT_BANK,
-                                     instrument)
+        if player is not None:
+            player.set_instrument(self.channel, self.bank, instrument)
 
     def __str__(self):
         return f'Channel {self.channel}: {self.instrument_name}'
@@ -569,9 +572,8 @@ def notes_to_messages(notes):
 class Song:
     def __init__(self,
                  midi_file=None,
-                 synth=None,
-                 soundfont=None,
-                 tempo=None,
+                 player=None,
+                 bpm=None,
                  ticks_per_beat=None,
                  cols_per_beat=DEFAULT_COLS_PER_BEAT,
                  beats_per_measure=DEFAULT_BEATS_PER_MEASURE,
@@ -579,16 +581,16 @@ class Song:
                  scale_name=DEFAULT_SCALE_NAME):
         self.notes = []
         self.tracks = []
-        self.tempo = tempo
+        self.bpm = bpm
         self.ticks_per_beat = ticks_per_beat
 
         if midi_file is not None:
-            self.import_midi(midi_file, synth, soundfont)
+            self.import_midi(midi_file, player)
         else:
-            self.create_track(synth=synth, soundfont=soundfont)
+            self.create_track(player=player)
 
-        if self.tempo is None:
-            self.tempo = DEFAULT_TEMPO
+        if self.bpm is None:
+            self.bpm = DEFAULT_BPM
         if self.ticks_per_beat is None:
             self.ticks_per_beat = DEFAULT_TICKS_PER_BEAT
         self.cols_per_beat = cols_per_beat
@@ -597,8 +599,8 @@ class Song:
         self.scale_name = scale_name
 
     @property
-    def bpm(self):
-        return tempo2bpm(self.tempo)
+    def tempo(self):
+        return bpm2tempo(self.bpm)
 
     @property
     def key_name(self):
@@ -771,8 +773,7 @@ class Song:
     def create_track(self,
                      channel=None,
                      instrument=DEFAULT_INSTRUMENT,
-                     synth=None,
-                     soundfont=None):
+                     player=None):
         if channel is None:
             channels = set()
             for track in self.tracks:
@@ -781,7 +782,7 @@ class Song:
             while channel in channels:
                 channel += 1
         track = Track(channel)
-        track.set_instrument(instrument, synth, soundfont)
+        track.set_instrument(instrument, player)
         self.tracks.append(track)
         return track
 
@@ -789,13 +790,12 @@ class Song:
                   channel,
                   create=True,
                   instrument=DEFAULT_INSTRUMENT,
-                  synth=None,
-                  soundfont=None):
+                  player=None):
         for track in self.tracks:
             if track.channel == channel:
                 return track
         if create:
-            return self.create_track(channel, instrument, synth, soundfont)
+            return self.create_track(channel, instrument, player)
         return None
 
     def delete_track(self, track):
@@ -807,7 +807,10 @@ class Song:
                 i += 1
         self.tracks.remove(track)
 
-    def import_midi(self, infile_path, synth=None, soundfont=None):
+    def import_midi(self, infile_path, player=None):
+        if not IMPORT_MIDO:
+            raise ValueError('mido is required to import MIDI files '
+                             '(pip install mido)')
         infile = MidiFile(infile_path)
         self.ticks_per_beat = infile.ticks_per_beat
 
@@ -825,8 +828,7 @@ class Song:
                                              track=self.get_track(
                                                  message.channel,
                                                  create=True,
-                                                 synth=synth,
-                                                 soundfont=soundfont)))
+                                                 player=player)))
                 elif message.type == 'note_off':
                     for note in active_notes:
                         if note.number == message.note:
@@ -842,18 +844,21 @@ class Song:
                 elif message.type == 'program_change':
                     self.get_track(message.channel).set_instrument(
                             message.program,
-                            synth,
-                            soundfont)
+                            player)
                 elif message.type == 'control_change':
                     if message.control == VOLUME_CONTROL:
                         self.get_track(message.channel).volume = message.value
                 elif message.type == 'set_tempo':
-                    if self.tempo is None:
-                        self.tempo = message.tempo
+                    if self.bpm is None:
+                        self.bpm = tempo2bpm(message.tempo)
 
         self.notes = sorted(notes)
 
     def export_midi(self, filename):
+        if not IMPORT_MIDO:
+            raise ValueError('mido is required to export MIDI files '
+                             '(pip install mido)')
+
         outfile = MidiFile(ticks_per_beat=self.ticks_per_beat)
 
         tempo_set = False

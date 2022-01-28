@@ -24,18 +24,16 @@ import sys
 from threading import Thread
 from traceback import format_exc
 
-from fluidsynth import Synth
-from mido import bpm2tempo
-
-from interface import Interface, KEYMAP
+from interface import Interface, ERROR_FLUIDSYNTH, ERROR_MIDO, KEYMAP
 from song import (Song,
                   COMMON_NAMES,
                   DEFAULT_BEATS_PER_MEASURE,
                   DEFAULT_COLS_PER_BEAT,
                   DEFAULT_KEY,
+                  IMPORT_MIDO,
                   NAME_TO_NUMBER,
                   SCALE_NAME_MAP)
-from playback import Player, PLAY_EVENT, KILL_EVENT
+from playback import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
 
 ###############################################################################
 # CONSTANTS
@@ -65,6 +63,9 @@ CURSES_KEY_NAMES = {
     curses.ascii.ESC: 'Escape',
 }
 
+ARGS = None
+PLAYER = None
+
 
 def wrapper(stdscr):
     # Hide curses cursor
@@ -79,24 +80,23 @@ def wrapper(stdscr):
         midi_file = None
 
     song = Song(midi_file=midi_file,
-                synth=SYNTH,
-                soundfont=SOUNDFONT,
-                tempo=bpm2tempo(ARGS.bpm) if ARGS.bpm is not None else None,
+                player=PLAYER,
+                bpm=ARGS.bpm if ARGS.bpm is not None else None,
                 ticks_per_beat=ARGS.ticks_per_beat,
                 cols_per_beat=ARGS.cols_per_beat,
                 beats_per_measure=ARGS.beats_per_measure,
                 key=NAME_TO_NUMBER[ARGS.key],
                 scale_name=ARGS.scale)
 
-    if SYNTH is not None:
-        player = Player(SYNTH, SOUNDFONT)
-        playback_thread = Thread(target=player.play_song, args=[song])
+    if PLAYER is not None:
+        playback_thread = Thread(target=PLAYER.play_song, args=[song])
         playback_thread.start()
     else:
         player = None
+        playback_thread = None
 
     try:
-        Interface(song, player, ARGS.file, ARGS.unicode).main(stdscr)
+        Interface(song, PLAYER, ARGS.file, ARGS.unicode).main(stdscr)
     except Exception:
         with open(CRASH_FILE, 'w') as crash_file:
             crash_file.write(format_exc())
@@ -104,9 +104,10 @@ def wrapper(stdscr):
         curses.cbreak()
         PLAY_EVENT.set()
         KILL_EVENT.set()
-        playback_thread.join()
-        if SYNTH is not None:
-            SYNTH.delete()
+        if playback_thread is not None:
+            playback_thread.join()
+        if PLAYER is not None:
+            PLAYER.synth.delete()
         sys.exit(0)
 
 
@@ -222,22 +223,38 @@ if __name__ == '__main__':
         print_keymap()
         sys.exit(0)
 
-    if ARGS.import_file:
-        ARGS.import_file = ARGS.import_file.name
-    elif ARGS.file:
-        ARGS.import_file = ARGS.file
+    if IMPORT_MIDO:
+        if ARGS.import_file:
+            ARGS.import_file = ARGS.import_file.name
+        elif ARGS.file:
+            ARGS.import_file = ARGS.file
+        if ARGS.file is None:
+            ARGS.file = DEFAULT_FILE
+    elif ARGS.file or ARGS.import_file:
+        print(ERROR_MIDO)
+        print()
+        print('Try running:')
+        print('pip3 install mido')
+        sys.exit(1)
 
-    if ARGS.soundfont:
-        ARGS.soundfont = ARGS.soundfont.name
-    elif os.path.isfile(DEFAULT_SOUNDFONT):
-        with open(DEFAULT_SOUNDFONT, 'r') as default_soundfont:
-            if default_soundfont.readable():
-                ARGS.soundfont = DEFAULT_SOUNDFONT
+    if IMPORT_FLUIDSYNTH:
+        if ARGS.soundfont:
+            ARGS.soundfont = ARGS.soundfont.name
+        elif os.path.isfile(DEFAULT_SOUNDFONT):
+            with open(DEFAULT_SOUNDFONT, 'r') as default_soundfont:
+                if default_soundfont.readable():
+                    ARGS.soundfont = DEFAULT_SOUNDFONT
+    elif ARGS.soundfont:
+        print(ERROR_FLUIDSYNTH)
+        print()
+        print('Make sure FluidSynth itself is installed:')
+        print('https://www.fluidsynth.org/download/')
+        print('Then try running:')
+        print('pip3 install pyfluidsynth')
+        sys.exit(1)
 
-    if ARGS.soundfont is not None:
-        SYNTH = Synth()
-        SYNTH.start()
-        SOUNDFONT = SYNTH.sfload(ARGS.soundfont)
+    if ARGS.soundfont is not None and IMPORT_FLUIDSYNTH:
+        PLAYER = Player(ARGS.soundfont)
 
     os.environ.setdefault('ESCDELAY', str(ESCDELAY))
 
