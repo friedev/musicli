@@ -82,23 +82,51 @@ FLAT_NAMES = (
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
 )
 
-SCALE_MAJOR = [0, 2, 4, 5, 7, 9, 11]
-SCALE_MAJOR_PENTATONIC = [0, 2, 4, 7, 9]
-SCALE_MINOR_NATURAL = [0, 2, 3, 5, 7, 8, 10]
-SCALE_MINOR_HARMONIC = [0, 2, 3, 5, 7, 8, 11]
-SCALE_MINOR_PENTATONIC = [0, 3, 5, 7, 10]
-SCALE_BLUES = [0, 3, 5, 6, 7, 10]
-SCALE_CHROMATIC = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+# Adapted from:
+# https://en.wikipedia.org/wiki/List_of_musical_scales_and_modes
+SCALES = {
+    'major': (0, 2, 4, 5, 7, 9, 11),
+    'major_pentatonic': (0, 2, 4, 7, 9),
+    'minor': (0, 2, 3, 5, 7, 8, 10),
+    'harmonic_minor': (0, 2, 3, 5, 7, 8, 11),
+    'melodic_minor': (0, 2, 3, 5, 7, 9, 11),
+    'minor_pentatonic': (0, 3, 5, 7, 10),
+    'blues': (0, 3, 5, 6, 7, 10),
+    'chromatic': (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+}
 
-SCALE_NAME_MAP = {
-    'major': SCALE_MAJOR,
-    'major_pentatonic': SCALE_MAJOR_PENTATONIC,
-    'minor': SCALE_MINOR_NATURAL,
-    'natural_minor': SCALE_MINOR_NATURAL,
-    'harmonic_minor': SCALE_MINOR_HARMONIC,
-    'minor_pentatonic': SCALE_MAJOR_PENTATONIC,
-    'blues': SCALE_BLUES,
-    'chromatic': SCALE_CHROMATIC,
+# Adapted from:
+# https://en.wikipedia.org/wiki/Interval_(music)
+# https://en.wikipedia.org/wiki/List_of_chords
+# https://en.wikipedia.org/wiki/Chord_names_and_symbols_(popular_music)
+# TODO add more obscure chords from the second link
+CHORDS = {
+    (0, 1): ('ii', 'minor second'),
+    (0, 2): ('II', 'major second'),
+    (0, 3): ('iii', 'minor third'),
+    (0, 4): ('III', 'major third'),
+    (0, 5): ('IV', 'perfect fourth'),
+    (0, 6): ('TT', 'tritone'),
+    (0, 7): ('V', 'perfect fifth'),
+    (0, 8): ('vi', 'minor sixth'),
+    (0, 9): ('VI', 'major sixth'),
+    (0, 10): ('vii', 'minor seventh'),
+    (0, 11): ('VII', 'major seventh'),
+    (0, 12): ('oct', 'octave'),
+    (0, 4, 7): ('maj', 'major chord'),
+    (0, 3, 7): ('min', 'minor chord'),
+    (0, 3, 6): ('dim', 'diminished chord'),
+    (0, 4, 8): ('aug', 'augmented chord'),
+    (0, 2, 7): ('sus2', 'suspended second chord'),
+    (0, 5, 7): ('sus4', 'suspended fourth chord'),
+    (0, 4, 7, 10): ('7', 'dominant seventh chord'),
+    (0, 4, 7, 11): ('maj7', 'major seventh chord'),
+    (0, 3, 7, 10): ('min7', 'minor seventh chord'),
+    (0, 3, 7, 11): ('minmaj7', 'minor major seventh chord'),
+    (0, 4, 7, 10, 13): ('9', 'dominant ninth chord'),
+    (0, 4, 7, 10, 14): ('7b9', 'dominant minor ninth chord'),
+    (0, 4, 7, 11, 14): ('maj9', 'major ninth chord'),
+    (0, 3, 7, 10, 14): ('min9', 'minor ninth chord'),
 }
 
 # Adapted from:
@@ -608,7 +636,7 @@ class Song:
 
     @property
     def scale(self):
-        return SCALE_NAME_MAP[self.scale_name]
+        return SCALES[self.scale_name]
 
     @property
     def notes_by_track(self):

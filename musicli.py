@@ -32,7 +32,7 @@ from song import (Song,
                   DEFAULT_KEY,
                   IMPORT_MIDO,
                   NAME_TO_NUMBER,
-                  SCALE_NAME_MAP)
+                  SCALES)
 from player import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
 
 ###############################################################################
@@ -197,7 +197,7 @@ if __name__ == '__main__':
             help='the key of the song to display in MusiCLI')
     parser.add_argument(
             '--scale',
-            choices=SCALE_NAME_MAP.keys(),
+            choices=SCALES.keys(),
             default='major',
             help='the scale of the song to display in MusiCLI')
     parser.add_argument(

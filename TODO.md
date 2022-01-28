@@ -31,6 +31,6 @@
 	- Better sharp/flat determination based on scale
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
 - MIDI port I/O
-- Real-time note durations in insert mode (recording mode)
+- Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
 - Mouse support (if possible)
 - Documentation
