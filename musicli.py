@@ -33,7 +33,7 @@ from song import (Song,
                   IMPORT_MIDO,
                   NAME_TO_NUMBER,
                   SCALE_NAME_MAP)
-from playback import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
+from player import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
 
 ###############################################################################
 # CONSTANTS

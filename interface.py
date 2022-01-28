@@ -19,7 +19,7 @@ import curses.ascii
 from enum import Enum
 from math import inf
 
-from playback import PLAY_EVENT, RESTART_EVENT
+from player import PLAY_EVENT, RESTART_EVENT
 from song import (Note,
                   number_to_name,
                   COMMON_NAMES,
