@@ -22,6 +22,7 @@ from math import inf
 from player import PLAY_EVENT, RESTART_EVENT
 from song import (Note,
                   number_to_name,
+                  CHORDS,
                   COMMON_NAMES,
                   DEFAULT_VELOCITY,
                   MAX_VELOCITY,
@@ -202,8 +203,20 @@ INSERT_KEYMAP = {
     'p': 28,  # E
 }
 
-INSERT_KEYLIST = tuple('zsxdcvgbhnjmq2w3er5t6y7ui9o0p')
-SHIFT_NUMBERS = tuple('!@#$%^&*()')
+SYMBOLS_TO_NUMBERS = {
+    '!': '1',
+    '@': '2',
+    '#': '3',
+    '$': '4',
+    '%': '5',
+    '^': '6',
+    '&': '7',
+    '*': '8',
+    '(': '9',
+    ')': '0',
+}
+
+INSERT_KEYLIST = tuple(INSERT_KEYMAP.keys())
 
 
 def init_color_pairs():
@@ -227,7 +240,7 @@ def init_color_pairs():
     curses.init_pair(PAIR_LINE,
                      COLOR_GRAY, -1)
     curses.init_pair(PAIR_PLAYHEAD,
-                     -1, curses.COLOR_WHITE)
+                     curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(PAIR_STATUS_NORMAL,
                      curses.COLOR_BLACK, curses.COLOR_BLUE)
     curses.init_pair(PAIR_STATUS_INSERT,
@@ -246,6 +259,49 @@ def format_velocity(velocity):
 
 def format_track(index, track):
     return f'Track {index + 1}: {track.instrument_name}'
+
+
+def format_notes(notes):
+    if len(notes) == 1:
+        return notes[0].full_name, str(notes[0])
+
+    sorted_notes = sorted(notes)
+
+    if not any(note.is_drum for note in notes):
+        unique_notes = []
+        semitones = set()
+        for note in sorted_notes:
+            if note.semitone not in semitones:
+                unique_notes.append(note)
+                semitones.add(note.semitone)
+
+        numbers = [note.number for note in unique_notes]
+        inversion = 0
+        while inversion < len(numbers):
+            intervals = [0]
+            for number in numbers[1:]:
+                intervals.append((number - intervals[-1] - numbers[0]) %
+                                 NOTES_PER_OCTAVE)
+            name_tuple = CHORDS.get(tuple(intervals))
+            if name_tuple is not None:
+                root = unique_notes[inversion].name
+                short_name, long_name = name_tuple
+                short_string = root + short_name
+                long_string = root + ' ' + long_name
+                if inversion > 0:
+                    bass = unique_notes[0].name
+                    short_string += f'/{bass}'
+                    long_string += f' over {bass} (inversion {inversion})'
+                return short_string, long_string
+            numbers.append(numbers.pop(0) + NOTES_PER_OCTAVE)
+            inversion += 1
+
+    short_string = ''
+    long_string = ''
+    for note in sorted_notes:
+        short_string += note.full_name + ' '
+        long_string += note.full_name + ' '
+    return short_string, long_string
 
 
 class FillerBlock:
@@ -392,7 +448,7 @@ class Interface:
         if self.player is not None:
             self.draw_line(self.song.ticks_to_cols(self.player.playhead) -
                            self.x_offset,
-                           ' ',
+                           '▏' if self.unicode else '|',
                            curses.color_pair(PAIR_PLAYHEAD))
 
     def draw_notes(self):
@@ -451,17 +507,17 @@ class Interface:
                                0,
                                note_name.ljust(4).rjust(6),
                                pair_note)
-            if 0 <= insert_key < len(INSERT_KEYLIST):
+            if 0 <= insert_key < len(INSERT_KEYMAP):
                 self.window.addstr(self.height - y - 1,
                                    0,
-                                   INSERT_KEYLIST[insert_key],
+                                   list(INSERT_KEYMAP.keys())[insert_key],
                                    pair_key)
 
     def draw_status_block(self, x, block, length):
         if isinstance(block, FillerBlock):
             filler_width = self.width - length - 1
             string = ' ' * filler_width
-            new_x = x + filler_width
+            new_x = x + max(filler_width, 0)
         else:
             string = str(block)[:self.width - x - 1]
             new_x = x + len(block)
@@ -474,6 +530,11 @@ class Interface:
         return new_x
 
     def draw_status_bar(self):
+        if len(self.message) == 0 and len(self.last_chord) > 0:
+            short_notes, long_notes = format_notes(self.last_chord)
+            self.message = (long_notes if len(long_notes) < self.width else
+                            short_notes)
+
         self.window.addstr(self.height - 1,
                            0,
                            self.message.ljust(self.width - 1)[:self.width - 1],
@@ -611,14 +672,6 @@ class Interface:
                               new_offset % cols_per_measure +
                               self.x_sidebar_offset)
 
-    def format_notes(self, notes):
-        if len(notes) == 1:
-            return str(notes[0])
-        string = ''
-        for note in sorted(notes, key=lambda x: x.number):
-            string += note.name_in_key(self.song.key, octave=True) + ' '
-        return string
-
     def insert_note(self, number, chord=False):
         if not PLAY_EVENT.is_set():
             self.stop_notes()
@@ -648,8 +701,6 @@ class Interface:
             self.last_note = note
             self.last_chord.append(note)
 
-        self.message = self.format_notes(self.last_chord)
-
         if not PLAY_EVENT.is_set():
             self.play_notes()
 
@@ -670,9 +721,8 @@ class Interface:
             else:
                 self.time = max(self.time - self.duration, nearest_time, 0)
         else:
-            chord_time = self.time
             inclusive = self.last_note is None
-            nearest_chord = self.song.get_next_chord(chord_time,
+            nearest_chord = self.song.get_next_chord(self.time,
                                                      self.track,
                                                      inclusive=inclusive)
             if len(nearest_chord) > 0:
@@ -692,8 +742,6 @@ class Interface:
             self.duration = self.last_note.duration
 
         self.snap_to_time()
-
-        self.message = self.format_notes(self.last_chord)
 
     def set_octave(self, increase):
         if increase:
@@ -1035,12 +1083,14 @@ class Interface:
         if self.insert:
             if curses.ascii.isprint(input_code):
                 input_char = chr(input_code)
-                number = INSERT_KEYMAP.get(input_char.lower())
+                number = INSERT_KEYMAP.get(SYMBOLS_TO_NUMBERS.get(
+                    input_char,
+                    input_char.lower()))
                 chord = input_char.isupper() or not input_char.isalnum()
                 if number is not None:
                     self.insert_note(number, chord)
                     return True
-                if input_char.isalnum() or input_char in SHIFT_NUMBERS:
+                if input_char.isalnum() or input_char in SYMBOLS_TO_NUMBERS:
                     self.message = f'Key "{input_char}" does not map to a note'
                     return False
         action = KEYMAP.get(input_code)

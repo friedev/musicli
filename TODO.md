@@ -26,9 +26,6 @@
 	- Save to interactively specified file
 	- Open interactively specified file
 	- Change channel properties (volume, color)
-- Music theory
-	- Basic chord identification in format_notes
-	- Better sharp/flat determination based on scale
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
 - MIDI port I/O
 - Real-time note durations in insert mode (recording mode that triggers raw mode in curses)

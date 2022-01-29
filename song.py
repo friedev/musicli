@@ -112,21 +112,20 @@ CHORDS = {
     (0, 9): ('VI', 'major sixth'),
     (0, 10): ('vii', 'minor seventh'),
     (0, 11): ('VII', 'major seventh'),
-    (0, 12): ('oct', 'octave'),
-    (0, 4, 7): ('maj', 'major chord'),
-    (0, 3, 7): ('min', 'minor chord'),
-    (0, 3, 6): ('dim', 'diminished chord'),
-    (0, 4, 8): ('aug', 'augmented chord'),
-    (0, 2, 7): ('sus2', 'suspended second chord'),
-    (0, 5, 7): ('sus4', 'suspended fourth chord'),
-    (0, 4, 7, 10): ('7', 'dominant seventh chord'),
-    (0, 4, 7, 11): ('maj7', 'major seventh chord'),
-    (0, 3, 7, 10): ('min7', 'minor seventh chord'),
-    (0, 3, 7, 11): ('minmaj7', 'minor major seventh chord'),
-    (0, 4, 7, 10, 13): ('9', 'dominant ninth chord'),
-    (0, 4, 7, 10, 14): ('7b9', 'dominant minor ninth chord'),
-    (0, 4, 7, 11, 14): ('maj9', 'major ninth chord'),
-    (0, 3, 7, 10, 14): ('min9', 'minor ninth chord'),
+    (0, 4, 3): ('maj', 'major chord'),
+    (0, 3, 4): ('min', 'minor chord'),
+    (0, 3, 3): ('dim', 'diminished chord'),
+    (0, 4, 4): ('aug', 'augmented chord'),
+    (0, 2, 5): ('sus2', 'suspended second chord'),
+    (0, 5, 2): ('sus4', 'suspended fourth chord'),
+    (0, 4, 3, 3): ('7', 'dominant seventh chord'),
+    (0, 4, 3, 4): ('maj7', 'major seventh chord'),
+    (0, 3, 4, 3): ('min7', 'minor seventh chord'),
+    (0, 3, 4, 4): ('minmaj7', 'minor major seventh chord'),
+    (0, 4, 3, 3, 3): ('9', 'dominant ninth chord'),
+    (0, 4, 3, 3, 4): ('7b9', 'dominant minor ninth chord'),
+    (0, 4, 3, 4, 4): ('maj9', 'major ninth chord'),
+    (0, 3, 4, 3, 4): ('min9', 'minor ninth chord'),
 }
 
 # Adapted from:
@@ -534,20 +533,24 @@ class Note:
             self.pair.velocity = velocity
 
     def __str__(self):
-        return f'{self.full_name} ({self.instrument_name} @ {self.velocity})'
+        return f'{self.full_name} (Velocity: {self.velocity})'
 
     def __repr__(self):
         return (f'Note(on={self.on}, '
                 f'number={self.number}, '
                 f'time={self.time}, '
-                f'track={self.track}, '
+                f'track={repr(self.track)}, '
                 f'velocity={self.velocity}, '
                 f'duration={self.duration})')
 
     def __lt__(self, other):
+        if self.time == other.time:
+            return self.number < other.number
         return self.time < other.time
 
     def __gt__(self, other):
+        if self.time == other.time:
+            return self.number > other.number
         return self.time > other.time
 
     def __eq__(self, other):
@@ -559,13 +562,18 @@ class Note:
 
 
 class DummyNote:
-    def __init__(self, time):
+    def __init__(self, time, number=0):
         self.time = time
+        self.number = number
 
     def __lt__(self, other):
+        if self.time == other.time:
+            return self.number < other.number
         return self.time < other.time
 
     def __gt__(self, other):
+        if self.time == other.time:
+            return self.number > other.number
         return self.time > other.time
 
     def __repr__(self):
@@ -721,7 +729,7 @@ class Song:
         if inclusive:
             index = bisect_left(self, DummyNote(time))
         else:
-            index = bisect_right(self, DummyNote(time))
+            index = bisect_right(self, DummyNote(time, number=TOTAL_NOTES))
         if not 0 <= index < len(self) or time > self[index].time:
             return len(self)
         while (index < len(self) and
