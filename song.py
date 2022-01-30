@@ -265,53 +265,53 @@ INSTRUMENT_NAMES = [
 # https://en.wikipedia.org/wiki/General_MIDI#Percussion
 # Offset by DRUM_OFFSET
 DRUM_NAMES = [
-    'Acoustic Bass Drum',
-    'Electric Bass Drum',
-    'Side Stick',
-    'Acoustic Snare',
-    'Hand Clap',
-    'Electric Snare',
-    'Low Floor Tom',
-    'Closed Hi-hat',
-    'High Floor Tom',
-    'Pedal Hi-hat',
-    'Low Tom',
-    'Open Hi-hat',
-    'Low-Mid Tom',
-    'Hi-Mid Tom',
-    'Crash Cymbal 1',
-    'High Tom',
-    'Ride Cymbal 1',
-    'Chinese Cymbal',
-    'Ride Bell',
-    'Tambourine',
-    'Splash Cymbal',
-    'Cowbell',
-    'Crash Cymbal 2',
-    'Vibraslap',
-    'Ride Cymbal 2',
-    'High Bongo',
-    'Low Bongo',
-    'Mute High Conga',
-    'Open High Conga',
-    'Low Conga',
-    'High Timbale',
-    'Low Timbale',
-    'High Agogo',
-    'Low Agogo',
-    'Cabasa',
-    'Maracas',
-    'Short Whistle',
-    'Long Whistle',
-    'Short Guiro',
-    'Long Guiro',
-    'Claves',
-    'High Woodblock',
-    'Low Woodblock',
-    'Mute Cuica',
-    'Open Cuica',
-    'Mute Triangle',
-    'Open Triangle',
+    ('ABass', 'Acoustic Bass Drum'),
+    ('EBass', 'Electric Bass Drum'),
+    ('SStick', 'Side Stick'),
+    ('ASnare', 'Acoustic Snare'),
+    ('Clap', 'Hand Clap'),
+    ('ESnare', 'Electric Snare'),
+    ('LFTom', 'Low Floor Tom'),
+    ('CHat', 'Closed Hi-hat'),
+    ('HFTom', 'High Floor Tom'),
+    ('PHat', 'Pedal Hi-hat'),
+    ('LTom', 'Low Tom'),
+    ('OHat', 'Open Hi-hat'),
+    ('LMTom', 'Low-Mid Tom'),
+    ('HMTom', 'Hi-Mid Tom'),
+    ('CCym1', 'Crash Cymbal 1'),
+    ('HTom', 'High Tom'),
+    ('RCym1', 'Ride Cymbal 1'),
+    ('CNCym', 'Chinese Cymbal'),
+    ('RBell', 'Ride Bell'),
+    ('Tamb', 'Tambourine'),
+    ('SCym', 'Splash Cymbal'),
+    ('CBell', 'Cowbell'),
+    ('CCym2', 'Crash Cymbal 2'),
+    ('VSlap', 'Vibraslap'),
+    ('RCym2', 'Ride Cymbal 2'),
+    ('HBongo', 'High Bongo'),
+    ('LBongo', 'Low Bongo'),
+    ('MConga', 'Mute High Conga'),
+    ('HConga', 'Open High Conga'),
+    ('LConga', 'Low Conga'),
+    ('HTimb', 'High Timbale'),
+    ('LTimb', 'Low Timbale'),
+    ('HAgogo', 'High Agogo'),
+    ('LAgogo', 'Low Agogo'),
+    ('Cabasa', 'Cabasa'),
+    ('Maraca', 'Maracas'),
+    ('SWhist', 'Short Whistle'),
+    ('LWhist', 'Long Whistle'),
+    ('SGuiro', 'Short Guiro'),
+    ('LGuiro', 'Long Guiro'),
+    ('Claves', 'Claves'),
+    ('HWood', 'High Woodblock'),
+    ('LWood', 'Low Woodblock'),
+    ('MCuica', 'Mute Cuica'),
+    ('OCuica', 'Open Cuica'),
+    ('MTri', 'Mute Triangle'),
+    ('OTri', 'Open Triangle'),
 ]
 
 DEFAULT_COLS_PER_BEAT = 4
@@ -471,9 +471,15 @@ class Note:
     def full_name(self):
         return self.name_in_key(None, octave=True)
 
-    def name_in_key(self, key, octave=False):
+    def name_in_key(self, key, octave=False, drum_name=True):
         if self.is_drum:
-            return str(self.number)
+            drum_number = self.number - DRUM_OFFSET
+            if 0 <= drum_number < len(DRUM_NAMES):
+                short_name, long_name = DRUM_NAMES[drum_number]
+            else:
+                short_name = str(self.number)
+                long_name = short_name
+            return long_name if octave else short_name
         return number_to_name(self.number, key, octave=octave)
 
     @property
@@ -495,7 +501,8 @@ class Note:
     @property
     def instrument_name(self):
         if self.is_drum:
-            return DRUM_NAMES[self.number - DRUM_OFFSET]
+            _, drum_name = DRUM_NAMES[self.number - DRUM_OFFSET]
+            return drum_name
         return self.track.instrument_name
 
     @property
@@ -806,17 +813,21 @@ class Song:
                 return True
         return False
 
+    def get_open_channel(self):
+        channels = set()
+        for track in self.tracks:
+            channels.add(track.channel)
+        channel = 0
+        while channel in channels or channel == DRUM_CHANNEL:
+            channel += 1
+        return channel
+
     def create_track(self,
                      channel=None,
                      instrument=DEFAULT_INSTRUMENT,
                      player=None):
         if channel is None:
-            channels = set()
-            for track in self.tracks:
-                channels.add(track.channel)
-            channel = 0
-            while channel in channels:
-                channel += 1
+            channel = self.get_open_channel()
         track = Track(channel)
         track.set_instrument(instrument, player)
         self.tracks.append(track)

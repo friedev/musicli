@@ -18,8 +18,6 @@
 	- Prefix actions with a number to repeat them
 - Instruments
 	- Focus on specific instrument (hide and mute others)
-	- Display drum names on sidebar when editing drums
-	- Separate drum window with a custom set of drums to use?
 	- Color notes based on their instrument's category (piano, brass, etc.)
 - In-editor functionality
 	- Change song properties (e.g. tempo, cols per beat, etc.)

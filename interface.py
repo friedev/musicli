@@ -25,6 +25,9 @@ from song import (Note,
                   CHORDS,
                   COMMON_NAMES,
                   DEFAULT_VELOCITY,
+                  DRUM_CHANNEL,
+                  DRUM_NAMES,
+                  DRUM_OFFSET,
                   MAX_VELOCITY,
                   NOTES_PER_OCTAVE,
                   TOTAL_INSTRUMENTS,
@@ -95,6 +98,7 @@ class Action(Enum):
     TRACK_INC = 'switch to the next track'
     INSTRUMENT_DEC = 'use the previous instrument on this channel'
     INSTRUMENT_INC = 'use the next instrument on this channel'
+    DRUM_TOGGLE = 'toggle this channel between drums and regular instruments'
     CYCLE_NOTES = 'cycle through notes in the selected chord'
     DESELECT_NOTES = 'deselect all notes'
     TRACK_CREATE = 'create a new track'
@@ -157,6 +161,8 @@ KEYMAP = {
     ord('='): Action.TRACK_INC,
     ord('_'): Action.INSTRUMENT_DEC,
     ord('+'): Action.INSTRUMENT_INC,
+    ord('z'): Action.DRUM_TOGGLE,
+    ord('Z'): Action.DRUM_TOGGLE,
     ord('o'): Action.TRACK_CREATE,
     ord('O'): Action.TRACK_CREATE,
     ord('t'): Action.TRACK_CREATE,
@@ -369,10 +375,6 @@ class Interface:
         self.last_chord = []
 
         self.window = None
-        self.x_sidebar_offset = -6
-        self.min_x_offset = self.x_sidebar_offset
-        self.min_y_offset = -2
-        self.max_y_offset = TOTAL_NOTES
         self.x_offset = self.min_x_offset
         self.y_offset = self.min_y_offset
 
@@ -394,6 +396,24 @@ class Interface:
         return self.window.getmaxyx()[0]
 
     @property
+    def x_sidebar_offset(self):
+        return -9 if self.track.is_drum else -6
+
+    @property
+    def min_x_offset(self):
+        return self.x_sidebar_offset
+
+    @property
+    def min_y_offset(self):
+        return -2
+
+    @property
+    def max_y_offset(self):
+        if self.window is not None:
+            return TOTAL_NOTES - self.height
+        return TOTAL_NOTES
+
+    @property
     def key(self):
         return COMMON_NAMES[self.song.key]
 
@@ -407,7 +427,6 @@ class Interface:
 
     def init_window(self, window):
         self.window = window
-        self.max_y_offset = TOTAL_NOTES - self.height
         self.y_offset = ((DEFAULT_OCTAVE + 1) * NOTES_PER_OCTAVE -
                          self.height // 2)
 
@@ -492,21 +511,33 @@ class Interface:
                 self.window.addstr(y, start_x, string, attr)
 
             note_width = end_x - start_x
-            if note_width >= 4 and (0 <= start_x + 1 and
-                                    start_x + len(note.name) < self.width - 1):
-                self.window.addstr(y, start_x + 1, note.name, attr)
+            if note_width >= 4 and 0 <= start_x + 1:
+                string_width = min(self.width, end_x) - start_x - 1
+                self.window.addstr(y,
+                                   start_x + 1,
+                                   note.name[:string_width],
+                                   attr)
 
     def draw_sidebar(self):
         pair_note = curses.color_pair(PAIR_SIDEBAR_NOTE)
         pair_key = curses.color_pair(PAIR_SIDEBAR_KEY)
         for y, number in enumerate(range(self.y_offset,
                                          self.y_offset + self.height)):
-            note_name = number_to_name(number)
-            insert_key = number - self.octave * NOTES_PER_OCTAVE
+            if self.track.is_drum:
+                drum_number = number - DRUM_OFFSET
+                if 0 <= drum_number < len(DRUM_NAMES):
+                    note_name, _ = DRUM_NAMES[drum_number]
+                else:
+                    note_name = str(number)
+            else:
+                note_name = number_to_name(number)
             self.window.addstr(self.height - y - 1,
                                0,
-                               note_name.ljust(4).rjust(6),
+                               '  ' + note_name.ljust(-self.x_sidebar_offset -
+                                                      2),
                                pair_note)
+
+            insert_key = number - self.octave * NOTES_PER_OCTAVE
             if 0 <= insert_key < len(INSERT_KEYMAP):
                 self.window.addstr(self.height - y - 1,
                                    0,
@@ -682,7 +713,6 @@ class Interface:
                 self.snap_to_time()
             self.last_chord = []
 
-        number += self.octave * NOTES_PER_OCTAVE
         note = Note(on=True,
                     number=number,
                     time=self.time,
@@ -850,6 +880,19 @@ class Interface:
         self.message = format_track(self.track_index, self.track)
 
         self.play_notes()
+
+    def drum_toggle(self):
+        self.stop_notes()
+
+        old_x_sidebar_offset = self.x_sidebar_offset
+        if self.track.is_drum:
+            self.track.channel = self.song.get_open_channel()
+        else:
+            self.track.channel = DRUM_CHANNEL
+        self.track.set_instrument(self.track.instrument, self.player)
+        self.x_offset += self.x_sidebar_offset - old_x_sidebar_offset
+
+        self.message = format_track(self.track_index, self.track)
 
     def delete(self, back, chord):
         if self.last_note is not None:
@@ -1055,6 +1098,8 @@ class Interface:
             self.set_instrument(increase=False)
         elif action == Action.INSTRUMENT_INC:
             self.set_instrument(increase=True)
+        elif action == Action.DRUM_TOGGLE:
+            self.drum_toggle()
         elif action == Action.TRACK_CREATE:
             self.create_track()
         elif action == Action.TRACK_DELETE:
@@ -1088,8 +1133,12 @@ class Interface:
                     input_char.lower()))
                 chord = input_char.isupper() or not input_char.isalnum()
                 if number is not None:
-                    self.insert_note(number, chord)
-                    return True
+                    number += self.octave * NOTES_PER_OCTAVE
+                    if 0 <= number <= TOTAL_NOTES:
+                        self.insert_note(number, chord)
+                        return True
+                    self.message = f'Note {number} is out of range 0-127'
+                    return False
                 if input_char.isalnum() or input_char in SYMBOLS_TO_NUMBERS:
                     self.message = f'Key "{input_char}" does not map to a note'
                     return False
