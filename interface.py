@@ -856,11 +856,13 @@ class Interface:
                 note.set_velocity(self.velocity)
 
     def set_track(self, increase):
+        old_x_sidebar_offset = self.x_sidebar_offset
         if increase:
             self.track_index += 1
         else:
             self.track_index -= 1
         self.track_index %= len(self.song.tracks)
+        self.x_offset += self.x_sidebar_offset - old_x_sidebar_offset
         self.highlight_track = True
 
         self.message = format_track(self.track_index, self.track)
