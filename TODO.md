@@ -13,7 +13,6 @@
 	- Word (chord) motion: jump to next chord regardless of distance, end of chord, start of previous chord
 	- Change a note/chord (delete and enter insert mode)
 	- Overwrite notes while inserting (replace mode)
-	- Merge one channel into another (need some way to choose or reorder tracks)
 	- Jump to measure number by typing the number and another key
 	- Prefix actions with a number to repeat them
 - Instruments
@@ -24,8 +23,22 @@
 	- Save to interactively specified file
 	- Open interactively specified file
 	- Change channel properties (volume, color)
+- Audio backends
+	- SFZ
+		- https://github.com/sfztools/sfizz
+		- https://github.com/00sapo/pycarla
+	- Waveform synthesis
+		- https://github.com/yuma-m/synthesizer
+		- https://github.com/luvsound/pippi
+		- https://github.com/zacharydenton/wavebender
+		- https://github.com/irmen/synthesizer
+		- https://mdoege.github.io/PySynth/
+	- WAV export
+		- https://docs.python.org/3/library/wave.html
+		- https://people.csail.mit.edu/hubert/pyaudio/docs/
+- Toggle view between note names and velocities
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
 - MIDI port I/O
 - Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
 - Mouse support (if possible)
-- Documentation
+- Code documentation
