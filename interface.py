@@ -883,15 +883,18 @@ class Interface:
 
         self.play_notes()
 
-    def drum_toggle(self):
+    def toggle_drum(self):
         self.stop_notes()
 
         old_x_sidebar_offset = self.x_sidebar_offset
         if self.track.is_drum:
-            self.track.channel = self.song.get_open_channel()
+            self.track.set_channel(self.song.get_open_channel())
         else:
-            self.track.channel = DRUM_CHANNEL
-        self.track.set_instrument(self.track.instrument, self.player)
+            for index, track in enumerate(self.song.tracks):
+                if track.is_drum:
+                    self.message = f'Track {index + 1} is already a drum track'
+                    return
+            self.track.set_channel(DRUM_CHANNEL)
         self.x_offset += self.x_sidebar_offset - old_x_sidebar_offset
 
         self.message = format_track(self.track_index, self.track)
@@ -1101,7 +1104,7 @@ class Interface:
         elif action == Action.INSTRUMENT_INC:
             self.set_instrument(increase=True)
         elif action == Action.DRUM_TOGGLE:
-            self.drum_toggle()
+            self.toggle_drum()
         elif action == Action.TRACK_CREATE:
             self.create_track()
         elif action == Action.TRACK_DELETE:

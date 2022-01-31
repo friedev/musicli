@@ -381,10 +381,18 @@ class Track:
             return 'Drums'
         return INSTRUMENT_NAMES[self.instrument]
 
+    def register(self, player):
+        player.set_instrument(self.channel, self.bank, self.instrument)
+
+    def set_channel(self, channel, player=None):
+        self.channel = channel
+        if player is not None:
+            self.register(player)
+
     def set_instrument(self, instrument, player=None):
         self.instrument = instrument
         if player is not None:
-            player.set_instrument(self.channel, self.bank, instrument)
+            self.register(player)
 
     def __str__(self):
         return f'Channel {self.channel}: {self.instrument_name}'
