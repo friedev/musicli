@@ -92,7 +92,6 @@ def wrapper(stdscr):
         playback_thread = Thread(target=PLAYER.play_song, args=[song])
         playback_thread.start()
     else:
-        player = None
         playback_thread = None
 
     try:

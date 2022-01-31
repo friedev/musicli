@@ -471,7 +471,7 @@ class Note:
     def full_name(self):
         return self.name_in_key(None, octave=True)
 
-    def name_in_key(self, key, octave=False, drum_name=True):
+    def name_in_key(self, key, octave=False):
         if self.is_drum:
             drum_number = self.number - DRUM_OFFSET
             if 0 <= drum_number < len(DRUM_NAMES):
@@ -889,12 +889,15 @@ class Song:
                                 active_notes.remove(note)
                                 break
                 elif message.type == 'program_change':
-                    self.get_track(message.channel).set_instrument(
-                            message.program,
-                            player)
+                    self.get_track(message.channel,
+                                   create=True,
+                                   player=player).set_instrument(
+                                           message.program, player)
                 elif message.type == 'control_change':
                     if message.control == VOLUME_CONTROL:
-                        self.get_track(message.channel).volume = message.value
+                        self.get_track(message.channel,
+                                       create=True,
+                                       player=player).volume = message.value
                 elif message.type == 'set_tempo':
                     if self.bpm is None:
                         self.bpm = tempo2bpm(message.tempo)
