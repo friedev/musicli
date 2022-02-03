@@ -1,7 +1,12 @@
 # TODO
 
-- Refactoring
+- MIDI support
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
+	- Handle additional messages
+		- key_signature (MetaMessage)
+		- track_name (MetaMessage)
+		- pitchwheel (Message)
+	- MIDI port I/O
 - Editing
 	- Select all notes in a time range (visual mode); one track by default, Shift for all tracks
 	- Delete/cut/copy/paste selected notes
@@ -38,7 +43,7 @@
 		- https://people.csail.mit.edu/hubert/pyaudio/docs/
 - Toggle view between note names and velocities
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
-- MIDI port I/O
 - Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
+- Add fake backends (curses and fluidsynth) via Interface and Player flags (this would allow for unit testing and profiling)
 - Mouse support (if possible)
 - Code documentation

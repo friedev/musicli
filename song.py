@@ -875,7 +875,7 @@ class Song:
             time = 0
             for message in track:
                 time += message.time
-                if message.type == 'note_on':
+                if message.type == 'note_on' and message.velocity > 0:
                     active_notes.append(Note(on=True,
                                              number=message.note,
                                              time=time,
@@ -884,7 +884,8 @@ class Song:
                                                  message.channel,
                                                  create=True,
                                                  player=player)))
-                elif message.type == 'note_off':
+                elif (message.type == 'note_off' or
+                        (message.type == 'note_on' and message.velocity == 0)):
                     for note in active_notes:
                         if note.number == message.note:
                             duration = time - note.time
