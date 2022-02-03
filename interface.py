@@ -101,6 +101,7 @@ class Action(Enum):
     DRUM_TOGGLE = 'toggle this channel between drums and regular instruments'
     CYCLE_NOTES = 'cycle through notes in the selected chord'
     DESELECT_NOTES = 'deselect all notes'
+    FOCUS_TOGGLE = 'focus on the current track and hide others'
     TRACK_CREATE = 'create a new track'
     TRACK_DELETE = 'delete the current track'
     PLAYBACK_TOGGLE = 'toggle playback (play/pause)'
@@ -163,8 +164,8 @@ KEYMAP = {
     ord('+'): Action.INSTRUMENT_INC,
     ord('z'): Action.DRUM_TOGGLE,
     ord('Z'): Action.DRUM_TOGGLE,
-    ord('o'): Action.TRACK_CREATE,
-    ord('O'): Action.TRACK_CREATE,
+    ord('f'): Action.FOCUS_TOGGLE,
+    ord('F'): Action.FOCUS_TOGGLE,
     ord('t'): Action.TRACK_CREATE,
     ord('T'): Action.TRACK_DELETE,
     ord(' '): Action.PLAYBACK_TOGGLE,
@@ -383,7 +384,7 @@ class Interface:
         self.filename = filename
         self.unicode = unicode
         self.highlight_track = False
-        self.solo_track = False
+        self.focus_track = False
 
         init_color_pairs()
 
@@ -475,6 +476,9 @@ class Interface:
         index = self.song.get_next_index(time)
         string = '▏' if self.unicode else '['
         for note in self.song.notes[index:]:
+            if self.focus_track and note.track is not self.track:
+                continue
+
             start_x = self.song.ticks_to_cols(note.start) - self.x_offset
             end_x = self.song.ticks_to_cols(note.end) - self.x_offset
             if start_x >= self.width - 1:
@@ -1105,6 +1109,8 @@ class Interface:
             self.set_instrument(increase=True)
         elif action == Action.DRUM_TOGGLE:
             self.toggle_drum()
+        elif action == Action.FOCUS_TOGGLE:
+            self.focus_track = not self.focus_track
         elif action == Action.TRACK_CREATE:
             self.create_track()
         elif action == Action.TRACK_DELETE:

@@ -20,8 +20,9 @@
 	- Overwrite notes while inserting (replace mode)
 	- Jump to measure number by typing the number and another key
 	- Prefix actions with a number to repeat them
-- Instruments
-	- Focus on specific instrument (hide and mute others)
+	- Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
+- View
+	- Toggle view between note names and velocities
 	- Color notes based on their instrument's category (piano, brass, etc.)
 - In-editor functionality
 	- Change song properties (e.g. tempo, cols per beat, etc.)
@@ -41,9 +42,7 @@
 	- WAV export
 		- https://docs.python.org/3/library/wave.html
 		- https://people.csail.mit.edu/hubert/pyaudio/docs/
-- Toggle view between note names and velocities
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
-- Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
 - Add fake backends (curses and fluidsynth) via Interface and Player flags (this would allow for unit testing and profiling)
 - Mouse support (if possible)
 - Code documentation
