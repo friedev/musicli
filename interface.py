@@ -516,7 +516,7 @@ class Interface:
 
             note_width = end_x - start_x
             if note_width >= 4 and 0 <= start_x + 1:
-                string_width = min(self.width, end_x) - start_x - 1
+                string_width = min(self.width, end_x) - start_x - 2
                 self.window.addstr(y,
                                    start_x + 1,
                                    note.name[:string_width],
@@ -603,7 +603,13 @@ class Interface:
         bar.append(StatusBlock(f'{key_name} {scale_name}',
                                key_name,
                                attr=color | curses.A_REVERSE,
-                               priority=3))
+                               priority=4))
+
+        if self.focus_track:
+            bar.append(StatusBlock('FOCUS',
+                                   'F',
+                                   attr=color | curses.A_BOLD,
+                                   priority=3))
 
         track_number_text = f'T{self.track_index + 1}/{len(self.song.tracks)}'
         bar.append(StatusBlock(f'{track_number_text}: ' +
@@ -624,14 +630,14 @@ class Interface:
             play_text = ''
         bar.append(StatusBlock(play_text,
                                attr=color | curses.A_BOLD,
-                               priority=4))
+                               priority=5))
 
         edit_measure = (self.song.ticks_to_beats(self.time) //
                         self.song.beats_per_measure +
                         1)
         bar.append(StatusBlock(f'C{edit_measure}/{end_measure}',
                                attr=color | curses.A_BOLD,
-                               priority=5))
+                               priority=6))
 
         length = sum([len(block) for block in bar])
         if length >= self.width:
