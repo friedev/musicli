@@ -730,10 +730,9 @@ class Song:
         return index
 
     def get_previous_index(self, time, track=None, on=False):
-        index = bisect_left(self, DummyNote(time))
+        index = bisect_left(self, DummyNote(time)) - 1
         if not 0 <= index < len(self) or time < self[index].time:
             return len(self)
-        index -= 1
         while (index >= 0 and
                ((track is not None and self[index].track is not track) or
                 (on and not self[index].on))):
