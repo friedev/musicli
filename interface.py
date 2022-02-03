@@ -385,6 +385,7 @@ class Interface:
         self.unicode = unicode
         self.highlight_track = False
         self.focus_track = False
+        self.repeat_count = 0
 
         init_color_pairs()
 
@@ -574,6 +575,13 @@ class Interface:
                            0,
                            self.message.ljust(self.width - 1)[:self.width - 1],
                            curses.color_pair(0))
+
+        if self.repeat_count > 0:
+            repeat_string = str(self.repeat_count)
+            self.window.addstr(self.height - 1,
+                               max(self.width - len(repeat_string) - 1, 0),
+                               repeat_string[:self.width],
+                               curses.color_pair(0))
 
         bar = []
 
@@ -1138,30 +1146,51 @@ class Interface:
         if input_code == curses.ERR:
             return False
 
+        if curses.ascii.isprint(input_code):
+            input_char = chr(input_code)
+        else:
+            input_char = ''
+
         # Reset temporary state upon an actual keypress
         self.message = ''
         self.highlight_track = False
 
         if self.insert:
-            if curses.ascii.isprint(input_code):
-                input_char = chr(input_code)
-                number = INSERT_KEYMAP.get(SYMBOLS_TO_NUMBERS.get(
-                    input_char,
-                    input_char.lower()))
-                chord = input_char.isupper() or not input_char.isalnum()
-                if number is not None:
-                    number += self.octave * NOTES_PER_OCTAVE
-                    if 0 <= number <= TOTAL_NOTES:
-                        self.insert_note(number, chord)
-                        return True
-                    self.message = f'Note {number} is out of range 0-127'
-                    return False
-                if input_char.isalnum() or input_char in SYMBOLS_TO_NUMBERS:
-                    self.message = f'Key "{input_char}" does not map to a note'
-                    return False
+            number = INSERT_KEYMAP.get(SYMBOLS_TO_NUMBERS.get(
+                input_char,
+                input_char.lower()))
+            chord = input_char.isupper() or not input_char.isalnum()
+            if number is not None:
+                number += self.octave * NOTES_PER_OCTAVE
+                if 0 <= number <= TOTAL_NOTES:
+                    self.insert_note(number, chord)
+                    return True
+                self.message = f'Note {number} is out of range 0-127'
+                return False
+            if input_char.isalnum() or input_char in SYMBOLS_TO_NUMBERS:
+                self.message = f'Key "{input_char}" does not map to a note'
+                return False
+
+        if input_char.isdigit():
+            self.repeat_count *= 10
+            self.repeat_count += int(input_char)
+            return True
+
         action = KEYMAP.get(input_code)
+
+        if action is None:
+            if len(input_char) > 0:
+                self.message = f'Key "{input_char}" does not map to an action'
+            else:
+                self.message = 'That key does not map to an action'
+            return False
+
         if action is not None:
-            return self.handle_action(action)
+            for _ in range(max(self.repeat_count, 1)):
+                self.handle_action(action)
+            self.repeat_count = 0
+            return True
+
         return False
 
     def main(self, window):

@@ -19,8 +19,9 @@
 	- Change a note/chord (delete and enter insert mode)
 	- Overwrite notes while inserting (replace mode)
 	- Jump to measure number by typing the number and another key
-	- Prefix actions with a number to repeat them
+	- Repeat last action
 	- Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
+	- Print a message if a key is not mapped to an action in normal mode
 - View
 	- Toggle view between note names and velocities
 	- Color notes based on their instrument's category (piano, brass, etc.)
