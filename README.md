@@ -34,7 +34,7 @@ I recommend the MuseScore General Soundfont, which can be freely downloaded from
 
 To run MusiCLI from the root directory of the repo, run:
 ```sh
-./musicli.py file.mid -soundfont=soundfont.sf2
+./musicli.py file.mid --soundfont=soundfont.sf2
 ```
 
 Providing a MIDI file to open is optional.
