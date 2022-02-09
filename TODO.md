@@ -1,8 +1,11 @@
 # TODO
 
+- Refactoring
+	- Refactor Song.tracks as a dict mapping from channel to Track
 - MIDI support
 	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
 	- Handle additional messages
+		- time_signature (MetaMessage)
 		- key_signature (MetaMessage)
 		- track_name (MetaMessage)
 		- pitchwheel (Message, pyfluidsynth.pitch_bend)

@@ -476,7 +476,10 @@ class Interface:
         time = self.song.cols_to_ticks(self.x_offset)
         index = self.song.get_next_index(time)
         string = '▏' if self.unicode else '['
-        for note in self.song.notes[index:]:
+        for note in self.song.events[index:]:
+            if not isinstance(note, Note):
+                continue
+
             if self.focus_track and note.track is not self.track:
                 continue
 

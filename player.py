@@ -18,6 +18,8 @@ import sys
 from threading import Event
 from time import sleep
 
+from song import MessageEvent, Note
+
 try:
     from fluidsynth import Synth
     IMPORT_FLUIDSYNTH = True
@@ -48,7 +50,7 @@ class Player:
 
     def play_note(self, note):
         if note.on:
-            self.synth.noteon(note.channel, note.number, note.net_velocity)
+            self.synth.noteon(note.channel, note.number, note.velocity)
         else:
             self.stop_note(note)
 
@@ -72,19 +74,19 @@ class Player:
             next_unit_time = (self.playhead -
                               (self.playhead % song.cols_to_ticks(1)) +
                               song.cols_to_ticks(1))
-            note_index = song.get_next_index(self.playhead, inclusive=True)
-            next_note = song[note_index]
+            event_index = song.get_next_index(self.playhead, inclusive=True)
+            next_event = song[event_index]
             active_notes = []
-            while note_index < len(song):
-                delta = min(next_unit_time, next_note.time) - self.playhead
+            while event_index < len(song):
+                delta = min(next_unit_time, next_event.time) - self.playhead
                 sleep(delta / song.ticks_per_beat / song.bpm * 60.0)
 
                 self.playhead += delta
 
                 if self.playhead == next_unit_time:
                     next_unit_time += song.cols_to_ticks(1)
-                    note_index = song.get_next_index(self.playhead)
-                    next_note = song[note_index]
+                    event_index = song.get_next_index(self.playhead)
+                    next_event = song[event_index]
 
                 if not PLAY_EVENT.is_set():
                     for note in active_notes:
@@ -95,16 +97,25 @@ class Player:
                 if KILL_EVENT.is_set():
                     sys.exit(0)
 
-                while (note_index < len(song) and
-                       self.playhead == next_note.time):
-                    if next_note.on:
-                        active_notes.append(next_note)
-                    elif next_note.pair in active_notes:
-                        active_notes.remove(next_note.pair)
-                    self.play_note(next_note)
-                    note_index += 1
-                    if note_index < len(song):
-                        next_note = song[note_index]
+                while (event_index < len(song) and
+                       self.playhead == next_event.time):
+                    if isinstance(next_event, Note):
+                        if next_event.on:
+                            active_notes.append(next_event)
+                        elif next_event.pair in active_notes:
+                            active_notes.remove(next_event.pair)
+                        self.play_note(next_event)
+                    elif isinstance(next_event, MessageEvent):
+                        if next_event.message.type == 'pitchwheel':
+                            self.synth.pitch_bend(next_event.track.channel,
+                                                  next_event.message.pitch)
+                        elif next_event.message.type == 'control_change':
+                            self.synth.cc(next_event.track.channel,
+                                          next_event.message.control,
+                                          next_event.message.value)
+                    event_index += 1
+                    if event_index < len(song):
+                        next_event = song[event_index]
 
             for note in active_notes:
                 self.stop_note(note)
