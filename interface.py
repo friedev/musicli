@@ -1200,12 +1200,26 @@ class Interface:
         self.init_window(window)
 
         # Loop until user the exits
+        previous_playhead = 0
+        redraw = True
         while True:
             if not self.insert and PLAY_EVENT.is_set():
                 self.snap_to_time(self.player.playhead, center=False)
 
-            self.draw()
-            self.window.refresh()
+            if redraw:
+                self.draw()
+                self.window.refresh()
+
             input_code = self.window.getch()
-            self.window.erase()
+
+            redraw = (input_code != curses.ERR or
+                      (PLAY_EVENT.is_set() and
+                       self.player.playhead != previous_playhead))
+
+            if PLAY_EVENT.is_set():
+                previous_playhead = self.player.playhead
+
+            if redraw:
+                self.window.erase()
+
             self.handle_input(input_code)

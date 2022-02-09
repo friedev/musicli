@@ -18,11 +18,8 @@ from bisect import bisect_left, bisect_right, insort
 
 try:
     from mido import (Message,
-                      MetaMessage,
                       MidiFile,
-                      MidiTrack,
-                      bpm2tempo,
-                      tempo2bpm)
+                      MidiTrack)
     IMPORT_MIDO = True
 except ImportError:
     IMPORT_MIDO = False
@@ -638,7 +635,6 @@ class Song:
     def __init__(self,
                  midi_file=None,
                  player=None,
-                 bpm=None,
                  ticks_per_beat=None,
                  cols_per_beat=DEFAULT_COLS_PER_BEAT,
                  beats_per_measure=DEFAULT_BEATS_PER_MEASURE,
@@ -646,7 +642,6 @@ class Song:
                  scale_name=DEFAULT_SCALE_NAME):
         self.events = []
         self.tracks = []
-        self.bpm = bpm
         self.ticks_per_beat = ticks_per_beat
 
         if midi_file is not None:
@@ -654,8 +649,6 @@ class Song:
         else:
             self.create_track(player=player)
 
-        if self.bpm is None:
-            self.bpm = DEFAULT_BPM
         if self.ticks_per_beat is None:
             self.ticks_per_beat = DEFAULT_TICKS_PER_BEAT
         self.cols_per_beat = cols_per_beat
@@ -664,10 +657,6 @@ class Song:
         self.scale_name = scale_name
 
         self.dirty = True
-
-    @property
-    def tempo(self):
-        return bpm2tempo(self.bpm)
 
     @property
     def key_name(self):
@@ -946,8 +935,7 @@ class Song:
                                            player=player)
                     events.append(MessageEvent(time, message, track))
                 elif message.type == 'set_tempo':
-                    if self.bpm is None:
-                        self.bpm = tempo2bpm(message.tempo)
+                    events.append(MessageEvent(time, message))
 
         self.events = sorted(events)
         self.dirty = True
@@ -959,12 +947,8 @@ class Song:
 
         outfile = MidiFile(ticks_per_beat=self.ticks_per_beat)
 
-        tempo_set = False
         for track, events in self.events_by_track.items():
             midi_track = MidiTrack()
-            if not tempo_set:
-                midi_track.append(MetaMessage('set_tempo', tempo=self.tempo))
-                tempo_set = True
             midi_track.append(Message('program_change',
                                       channel=track.channel,
                                       program=track.instrument))

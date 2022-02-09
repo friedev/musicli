@@ -18,7 +18,9 @@ import sys
 from threading import Event
 from time import sleep
 
-from song import MessageEvent, Note
+from mido import tempo2bpm
+
+from song import MessageEvent, Note, DEFAULT_BPM
 
 try:
     from fluidsynth import Synth
@@ -59,6 +61,8 @@ class Player:
 
     def play_song(self, song):
         while True:
+            bpm = DEFAULT_BPM
+
             if RESTART_EVENT.is_set():
                 RESTART_EVENT.clear()
 
@@ -80,7 +84,7 @@ class Player:
             active_notes = []
             while event_index < len(song):
                 delta = min(next_unit_time, next_event.time) - self.playhead
-                sleep(delta / song.ticks_per_beat / song.bpm * 60.0)
+                sleep(delta / song.ticks_per_beat / bpm * 60.0)
 
                 self.playhead += delta
 
@@ -117,6 +121,8 @@ class Player:
                             self.synth.cc(next_event.track.channel,
                                           next_event.message.control,
                                           next_event.message.value)
+                        elif next_event.message.type == 'set_tempo':
+                            bpm = tempo2bpm(next_event.message.tempo)
                     event_index += 1
                     if event_index < len(song):
                         next_event = song[event_index]

@@ -1,16 +1,9 @@
 # TODO
 
-- Refactoring
-	- Refactor Song.tracks as a dict mapping from channel to Track
-- MIDI support
-	- Save all messages including control changes (e.g. volume) as non-note events in the song (separate track, uneditable for now)
-	- Handle additional messages
-		- time_signature (MetaMessage)
-		- key_signature (MetaMessage)
-		- track_name (MetaMessage)
-		- pitchwheel (Message, pyfluidsynth.pitch_bend)
-		- control_change (Message, pyfluidsynth.cc)
-			- Also generalize volume as a CC
+- MIDI message support
+	- time_signature (MetaMessage)
+	- key_signature (MetaMessage)
+	- track_name (MetaMessage)
 - Modal editing
 	- Select all notes in a time range (visual mode); one track by default, Shift for all tracks
 	- Delete/cut/copy/paste selected notes
@@ -28,7 +21,7 @@
 	- Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
 	- Track last inserted semitones to support repeating
 - Editor capabilities
-	- Change song properties (e.g. tempo, cols per beat, etc.)
+	- Change song properties (e.g. cols per beat, time signature, key signature, etc.)
 	- Save to interactively specified file
 	- Open interactively specified file
 	- Change channel properties (volume, color)

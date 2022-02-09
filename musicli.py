@@ -81,7 +81,6 @@ def wrapper(stdscr):
 
     song = Song(midi_file=midi_file,
                 player=PLAYER,
-                bpm=ARGS.bpm if ARGS.bpm is not None else None,
                 ticks_per_beat=ARGS.ticks_per_beat,
                 cols_per_beat=ARGS.cols_per_beat,
                 beats_per_measure=ARGS.beats_per_measure,
@@ -184,10 +183,6 @@ if __name__ == '__main__':
             type=positive_int,
             default=DEFAULT_BEATS_PER_MEASURE,
             help='the number of beats per measure to display in MusiCLI')
-    parser.add_argument(
-            '--bpm',
-            type=positive_int,
-            help='the tempo of the song in beats per minute (BPM)')
     parser.add_argument(
             '--key',
             type=str,
