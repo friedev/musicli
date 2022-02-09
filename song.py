@@ -683,11 +683,11 @@ class Song:
 
     @property
     def start(self):
-        return self[0].start if len(self.events) > 0 else 0
+        return self[0].time if len(self.events) > 0 else 0
 
     @property
     def end(self):
-        return self[-1].end if len(self.events) > 0 else 0
+        return self[-1].time if len(self.events) > 0 else 0
 
     def ticks_to_beats(self, ticks):
         return ticks // self.ticks_per_beat
