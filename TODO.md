@@ -5,9 +5,10 @@
 	- Handle additional messages
 		- key_signature (MetaMessage)
 		- track_name (MetaMessage)
-		- pitchwheel (Message)
-	- MIDI port I/O
-- Editing
+		- pitchwheel (Message, pyfluidsynth.pitch_bend)
+		- control_change (Message, pyfluidsynth.cc)
+			- Also generalize volume as a CC
+- Modal editing
 	- Select all notes in a time range (visual mode); one track by default, Shift for all tracks
 	- Delete/cut/copy/paste selected notes
 	- Transpose (just vertical movement)
@@ -23,14 +24,17 @@
 	- Repeat last action
 	- Real-time note durations in insert mode (recording mode that triggers raw mode in curses)
 	- Track last inserted semitones to support repeating
-- View
-	- Toggle view between note names and velocities
-	- Color notes based on their instrument's category (piano, brass, etc.)
-- In-editor functionality
+- Editor capabilities
 	- Change song properties (e.g. tempo, cols per beat, etc.)
 	- Save to interactively specified file
 	- Open interactively specified file
 	- Change channel properties (volume, color)
+	- View/create/delete CC messages
+- View
+	- Toggle view between note names and velocities
+	- Color notes based on their instrument's category (piano, brass, etc.)
+	- High-level song overview that shows when different tracks are active
+	- Pattern editor mode (drums, bass, etc.)
 - Audio backends
 	- SFZ
 		- https://github.com/sfztools/sfizz
@@ -44,6 +48,7 @@
 	- WAV export
 		- https://docs.python.org/3/library/wave.html
 		- https://people.csail.mit.edu/hubert/pyaudio/docs/
+- MIDI port I/O
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
 - Add fake backends (curses and fluidsynth) via Interface and Player flags (this would allow for unit testing and profiling)
 - Mouse support (if possible)
