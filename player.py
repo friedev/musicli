@@ -70,6 +70,7 @@ class Player:
                 PLAY_EVENT.clear()
                 continue
 
+            song.dirty = False
             self.playhead = self.restart_time
             next_unit_time = (self.playhead -
                               (self.playhead % song.cols_to_ticks(1)) +
@@ -85,8 +86,6 @@ class Player:
 
                 if self.playhead == next_unit_time:
                     next_unit_time += song.cols_to_ticks(1)
-                    event_index = song.get_next_index(self.playhead)
-                    next_event = song[event_index]
 
                 if not PLAY_EVENT.is_set():
                     for note in active_notes:
@@ -96,6 +95,11 @@ class Player:
                     break
                 if KILL_EVENT.is_set():
                     sys.exit(0)
+
+                if song.dirty:
+                    event_index = song.get_next_index(self.playhead)
+                    next_event = song[event_index]
+                    song.dirty = False
 
                 while (event_index < len(song) and
                        self.playhead == next_event.time):

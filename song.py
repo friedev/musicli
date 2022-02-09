@@ -588,16 +588,6 @@ class Note(BaseNote):
                 f'velocity={self.velocity}, '
                 f'duration={self.duration})')
 
-    def __lt__(self, other):
-        if self.time == other.time:
-            return self.number < other.number
-        return self.time < other.time
-
-    def __gt__(self, other):
-        if self.time == other.time:
-            return self.number > other.number
-        return self.time > other.time
-
     def __eq__(self, other):
         return (isinstance(other, Note) and
                 self.on == other.on and
@@ -673,6 +663,8 @@ class Song:
         self.key = key
         self.scale_name = scale_name
 
+        self.dirty = True
+
     @property
     def tempo(self):
         return bpm2tempo(self.bpm)
@@ -720,6 +712,7 @@ class Song:
             if note.pair is None:
                 raise ValueError('Note {note} is unpaired')
             insort(self.events, note.pair)
+        self.dirty = True
 
     def remove_note(self, note, pair=True, lookup=False):
         # Get the song note rather than the given note, since externally
@@ -731,6 +724,7 @@ class Song:
             if note.pair is None:
                 raise ValueError('Note {song_note} is unpaired')
             self.events.remove(note.pair)
+        self.dirty = True
 
     def move_note(self, note, time):
         self.remove_note(note)
@@ -882,6 +876,7 @@ class Song:
         track = Track(channel)
         track.set_instrument(instrument, player)
         self.tracks.append(track)
+        self.dirty = True
         return track
 
     def get_track(self,
@@ -949,12 +944,13 @@ class Song:
                     track = self.get_track(message.channel,
                                            create=True,
                                            player=player)
-                    self.events.append(MessageEvent(time, message, track))
+                    events.append(MessageEvent(time, message, track))
                 elif message.type == 'set_tempo':
                     if self.bpm is None:
                         self.bpm = tempo2bpm(message.tempo)
 
         self.events = sorted(events)
+        self.dirty = True
 
     def export_midi(self, filename):
         if not IMPORT_MIDO:
