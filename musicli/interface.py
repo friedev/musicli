@@ -19,19 +19,19 @@ import curses.ascii
 from enum import Enum
 from math import inf
 
-from player import PLAY_EVENT, RESTART_EVENT
-from song import (Note,
-                  number_to_name,
-                  CHORDS,
-                  COMMON_NAMES,
-                  DEFAULT_VELOCITY,
-                  DRUM_CHANNEL,
-                  DRUM_NAMES,
-                  DRUM_OFFSET,
-                  MAX_VELOCITY,
-                  NOTES_PER_OCTAVE,
-                  TOTAL_INSTRUMENTS,
-                  TOTAL_NOTES)
+from .player import PLAY_EVENT, RESTART_EVENT
+from .song import (Note,
+                   number_to_name,
+                   CHORDS,
+                   COMMON_NAMES,
+                   DEFAULT_VELOCITY,
+                   DRUM_CHANNEL,
+                   DRUM_NAMES,
+                   DRUM_OFFSET,
+                   MAX_VELOCITY,
+                   NOTES_PER_OCTAVE,
+                   TOTAL_INSTRUMENTS,
+                   TOTAL_NOTES)
 
 
 # On some systems, color 8 is gray, but this is not fully standardized

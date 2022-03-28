@@ -20,7 +20,7 @@ from time import sleep
 
 from mido import tempo2bpm
 
-from song import MessageEvent, Note, DEFAULT_BPM
+from .song import MessageEvent, Note, DEFAULT_BPM
 
 try:
     from fluidsynth import Synth

@@ -22,9 +22,10 @@ The tag `v2.0.0` marks the state of MusiCLI at the end of the hackathon.
 
 For directions on installing FluidSynth for your platform, refer to [Getting FluidSynth](https://www.fluidsynth.org/download/).
 
-Then, to install the required Python dependencies, run:
+Then, clone the repository and run:
+
 ```sh
-pip3 install -r requirements.txt
+pip install .
 ```
 
 For live playback, you will need a soundfont in SF2 format.
@@ -32,9 +33,10 @@ I recommend the MuseScore General Soundfont, which can be freely downloaded from
 
 ## Usage
 
-To run MusiCLI from the root directory of the repo, run:
+To run MusiCLI:
+
 ```sh
-./musicli.py file.mid --soundfont=soundfont.sf2
+musicli file.mid --soundfont=soundfont.sf2
 ```
 
 Providing a MIDI file to open is optional.
@@ -42,22 +44,24 @@ Providing an existing MIDI file will import it, while providing a nonexistent fi
 You may also provide no file; if you choose to save later, it will be saved as `untitled.mid`.
 
 If you wish to import a MIDI file, but save changes to another file, use the `--import` or `-i` option:
+
 ```sh
-./musicli.py file_to_export.mid --import=file_to_import.mid --soundfont=soundfont.sf2
+musicli file_to_export.mid --import=file_to_import.mid --soundfont=soundfont.sf2
 ```
 
 Providing a soundfont with `--soundfont` or `-f` is also optional, but live playback will be unavailable unless you do.
 If no soundfont is provided, MusiCLI will look for one at `/usr/share/soundfonts/default.sf2`, which is FluidSynth's default location.
 
 Much more song-specific information can be customized via other command line arguments. View a full list by running:
+
 ```sh
-./musicli.py --help
+musicli --help
 ```
 ### Keybindings
 
 **For a full list of editor keybindings, run:**
 ```sh
-./musicli.py --keymap
+musicli --keymap
 ```
 
 ### Interface

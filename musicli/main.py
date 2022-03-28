@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # MusiCLI - A MIDI sequencer for the terminal
 # Copyright (C) 2022 Aaron Friesen
 #
@@ -24,16 +23,16 @@ import sys
 from threading import Thread
 from traceback import format_exc
 
-from interface import Interface, ERROR_FLUIDSYNTH, ERROR_MIDO, KEYMAP
-from song import (Song,
-                  COMMON_NAMES,
-                  DEFAULT_BEATS_PER_MEASURE,
-                  DEFAULT_COLS_PER_BEAT,
-                  DEFAULT_KEY,
-                  IMPORT_MIDO,
-                  NAME_TO_NUMBER,
-                  SCALES)
-from player import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
+from .interface import Interface, ERROR_FLUIDSYNTH, ERROR_MIDO, KEYMAP
+from .song import (Song,
+                   COMMON_NAMES,
+                   DEFAULT_BEATS_PER_MEASURE,
+                   DEFAULT_COLS_PER_BEAT,
+                   DEFAULT_KEY,
+                   IMPORT_MIDO,
+                   NAME_TO_NUMBER,
+                   SCALES)
+from .player import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
 
 # Default files
 DEFAULT_FILE = 'untitled.mid'
@@ -142,7 +141,7 @@ def optional_file(value):
     return value
 
 
-if __name__ == '__main__':
+def main():
     # Parse arguments
     parser = ArgumentParser(
             description='A MIDI sequencer for the terminal')
@@ -207,6 +206,7 @@ if __name__ == '__main__':
                  'set to /dev/null to disable the crash file')
     parser.set_defaults(unicode=True)
 
+    global ARGS
     ARGS = parser.parse_args()
 
     if ARGS.keymap:
@@ -244,6 +244,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if ARGS.soundfont is not None and IMPORT_FLUIDSYNTH:
+        global PLAYER
         PLAYER = Player(ARGS.soundfont)
 
     os.environ.setdefault('ESCDELAY', str(ESCDELAY))

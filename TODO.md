@@ -1,6 +1,5 @@
 # TODO
 
-- Reorganize into a Python package
 - MIDI message support
 	- time_signature (MetaMessage)
 	- key_signature (MetaMessage)
