@@ -35,10 +35,6 @@ from song import (Song,
                   SCALES)
 from player import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
 
-###############################################################################
-# CONSTANTS
-###############################################################################
-
 # Default files
 DEFAULT_FILE = 'untitled.mid'
 DEFAULT_SOUNDFONT = '/usr/share/soundfonts/default.sf2'

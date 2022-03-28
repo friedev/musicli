@@ -804,6 +804,9 @@ class Interface:
                           self.height // 2)
 
     def set_time(self, increase, chord):
+        if self.last_note is None:
+            return
+
         if not chord:
             if increase:
                 new_start = self.last_note.start + self.song.cols_to_ticks(1)
@@ -863,7 +866,7 @@ class Interface:
 
     def set_velocity(self, increase, chord):
         if increase:
-            self.velocity = min(self.velocity + 1, MAX_VELOCITY)
+            self.velocity = min(self.velocity + 1, MAX_VELOCITY - 1)
         else:
             self.velocity = max(self.velocity - 1, 0)
 
@@ -909,13 +912,13 @@ class Interface:
 
         old_x_sidebar_offset = self.x_sidebar_offset
         if self.track.is_drum:
-            self.track.set_channel(self.song.get_open_channel())
+            self.track.set_channel(self.song.get_open_channel(), self.player)
         else:
             for index, track in enumerate(self.song.tracks):
                 if track.is_drum:
                     self.message = f'Track {index + 1} is already a drum track'
                     return
-            self.track.set_channel(DRUM_CHANNEL)
+            self.track.set_channel(DRUM_CHANNEL, self.player)
         self.x_offset += self.x_sidebar_offset - old_x_sidebar_offset
 
         self.message = format_track(self.track_index, self.track)

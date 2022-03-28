@@ -733,7 +733,8 @@ class Song:
                self[index].time == time and
                ((note and not isinstance(self[index], Note)) or
                 (track is not None and self[index].track is not track) or
-                (on and not self[index].on))):
+                (on and not (isinstance(self[index], Note) and
+                             self[index].on)))):
             index += 1
         return index
 
@@ -748,7 +749,8 @@ class Song:
         while (index >= 0 and
                ((note and not isinstance(self[index], Note)) or
                 (track is not None and self[index].track is not track) or
-                (on and not self[index].on))):
+                (on and not (isinstance(self[index], Note) and
+                             self[index].on)))):
             index -= 1
         return index
 
@@ -768,7 +770,8 @@ class Song:
         while (index < len(self) and
                ((note and not isinstance(self[index], Note)) or
                 (track is not None and self[index].track is not track) or
-                (on and not self[index].on))):
+                (on and not (isinstance(self[index], Note) and
+                             self[index].on)))):
             index += 1
         return index
 
@@ -797,8 +800,8 @@ class Song:
         index += 1
         while (index < len(self) and
                self[index].time == chord_time):
-            if (self[index].on and
-                    isinstance(self[index], Note) and
+            if (isinstance(self[index], Note) and
+                    self[index].on and
                     (track is None or self[index].track is track)):
                 chord.append(self[index])
             index += 1
@@ -812,8 +815,8 @@ class Song:
         chord = [self[index]]
         index -= 1
         while index >= 0 and self[index].time == chord_time:
-            if (self[index].on and
-                    isinstance(self[index], Note) and
+            if (isinstance(self[index], Note) and
+                    self[index].on and
                     (track is None or self[index].track is track)):
                 chord.append(self[index])
             index -= 1
@@ -827,8 +830,8 @@ class Song:
         chord = [self[index]]
         index += 1
         while index < len(self) and self[index].time == chord_time:
-            if (self[index].on and
-                    isinstance(self[index], Note) and
+            if (isinstance(self[index], Note) and
+                    self[index].on and
                     (track is None or self[index].track is track)):
                 chord.append(self[index])
             index += 1

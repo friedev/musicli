@@ -1,5 +1,6 @@
 # TODO
 
+- Reorganize into a Python package
 - MIDI message support
 	- time_signature (MetaMessage)
 	- key_signature (MetaMessage)
@@ -27,6 +28,7 @@
 	- Change channel properties (volume, color)
 	- View/create/delete CC messages
 - View
+	- Highlight entire last chord in white for drums
 	- Toggle view between note names and velocities
 	- Color notes based on their instrument's category (piano, brass, etc.)
 	- High-level song overview that shows when different tracks are active
@@ -44,8 +46,11 @@
 	- WAV export
 		- https://docs.python.org/3/library/wave.html
 		- https://people.csail.mit.edu/hubert/pyaudio/docs/
+- Make `active_notes` a `Player` field and add a `stop_all_notes` method (can fix notes not being stopped after switching instruments/toggling drums)
+- Interactive help: `?` to view keymap in embedded pager
+- Display a centered informational banner when opening a blank song (like vim)
 - MIDI port I/O
 - Visualizer mode (command line argument): just play the song with no editing features and exit when done
-- Add fake backends (curses and fluidsynth) via Interface and Player flags (this would allow for unit testing and profiling)
+- Add fake backends (curses and FluidSynth) via `Interface` and `Player` flags to allow for unit testing and profiling
 - Mouse support (if possible)
 - Code documentation
