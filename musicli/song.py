@@ -418,12 +418,12 @@ class BaseNote(SongEvent):
     def __lt__(self, other):
         if isinstance(other, BaseNote) and self.time == other.time:
             return self.number < other.number
-        return self.time < other.time
+        return super().__lt__(other)
 
     def __gt__(self, other):
         if isinstance(other, BaseNote) and self.time == other.time:
             return self.number > other.number
-        return self.time > other.time
+        return super().__gt__(other)
 
     def __repr__(self):
         return (f'BaseNote(time={self.time}, '
@@ -591,6 +591,25 @@ class Note(BaseNote):
                 self.number == other.number and
                 self.time == other.time and
                 self.channel == other.channel)
+
+    # Sorting off notes before on notes prevents an unintended staccato effect
+    # where a note is played and then immediately stopped by the off event for
+    # a note of the same pitch ending at the same time
+    # (e.g. 2 back-to-back quarter notes of the same pitch)
+
+    def __lt__(self, other):
+        if (isinstance(other, Note) and
+                self.time == other.time and
+                self.number == other.number):
+            return not self.on and other.on
+        return super().__lt__(other)
+
+    def __gt__(self, other):
+        if (isinstance(other, Note) and
+                self.time == other.time and
+                self.number == other.number):
+            return self.on and not other.on
+        return super().__gt__(other)
 
 
 class MessageEvent(SongEvent):
