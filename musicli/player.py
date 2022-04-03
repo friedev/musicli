@@ -24,6 +24,7 @@ from .song import MessageEvent, Note, DEFAULT_BPM
 
 try:
     from fluidsynth import Synth
+
     IMPORT_FLUIDSYNTH = True
 except ImportError:
     IMPORT_FLUIDSYNTH = False
@@ -76,9 +77,11 @@ class Player:
 
             song.dirty = False
             self.playhead = self.restart_time
-            next_unit_time = (self.playhead -
-                              (self.playhead % song.cols_to_ticks(1)) +
-                              song.cols_to_ticks(1))
+            next_unit_time = (
+                self.playhead
+                - (self.playhead % song.cols_to_ticks(1))
+                + song.cols_to_ticks(1)
+            )
             event_index = song.get_next_index(self.playhead, inclusive=True)
             next_event = song[event_index]
             active_notes = []
@@ -105,8 +108,9 @@ class Player:
                     next_event = song[event_index]
                     song.dirty = False
 
-                while (event_index < len(song) and
-                       self.playhead == next_event.time):
+                while (
+                    event_index < len(song) and self.playhead == next_event.time
+                ):
                     if isinstance(next_event, Note):
                         if next_event.on:
                             active_notes.append(next_event)
@@ -114,14 +118,18 @@ class Player:
                             active_notes.remove(next_event.pair)
                         self.play_note(next_event)
                     elif isinstance(next_event, MessageEvent):
-                        if next_event.message.type == 'pitchwheel':
-                            self.synth.pitch_bend(next_event.track.channel,
-                                                  next_event.message.pitch)
-                        elif next_event.message.type == 'control_change':
-                            self.synth.cc(next_event.track.channel,
-                                          next_event.message.control,
-                                          next_event.message.value)
-                        elif next_event.message.type == 'set_tempo':
+                        if next_event.message.type == "pitchwheel":
+                            self.synth.pitch_bend(
+                                next_event.track.channel,
+                                next_event.message.pitch,
+                            )
+                        elif next_event.message.type == "control_change":
+                            self.synth.cc(
+                                next_event.track.channel,
+                                next_event.message.control,
+                                next_event.message.value,
+                            )
+                        elif next_event.message.type == "set_tempo":
                             bpm = tempo2bpm(next_event.message.tempo)
                     event_index += 1
                     if event_index < len(song):

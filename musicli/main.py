@@ -24,38 +24,40 @@ from threading import Thread
 from traceback import format_exc
 
 from .interface import Interface, ERROR_FLUIDSYNTH, ERROR_MIDO, KEYMAP
-from .song import (Song,
-                   COMMON_NAMES,
-                   DEFAULT_BEATS_PER_MEASURE,
-                   DEFAULT_COLS_PER_BEAT,
-                   DEFAULT_KEY,
-                   IMPORT_MIDO,
-                   NAME_TO_NUMBER,
-                   SCALES)
+from .song import (
+    Song,
+    COMMON_NAMES,
+    DEFAULT_BEATS_PER_MEASURE,
+    DEFAULT_COLS_PER_BEAT,
+    DEFAULT_KEY,
+    IMPORT_MIDO,
+    NAME_TO_NUMBER,
+    SCALES,
+)
 from .player import Player, IMPORT_FLUIDSYNTH, PLAY_EVENT, KILL_EVENT
 
 # Default files
-DEFAULT_FILE = 'untitled.mid'
-DEFAULT_SOUNDFONT = '/usr/share/soundfonts/default.sf2'
-CRASH_FILE = 'crash.log'
+DEFAULT_FILE = "untitled.mid"
+DEFAULT_SOUNDFONT = "/usr/share/soundfonts/default.sf2"
+CRASH_FILE = "crash.log"
 
 ESCDELAY = 25
 
 CURSES_KEY_NAMES = {
-    curses.KEY_LEFT: 'Left',
-    curses.KEY_RIGHT: 'Right',
-    curses.KEY_UP: 'Up',
-    curses.KEY_DOWN: 'Down',
-    curses.KEY_PPAGE: 'Page Up',
-    curses.KEY_NPAGE: 'Page Down',
-    curses.KEY_HOME: 'Home',
-    curses.KEY_END: 'End',
-    curses.KEY_IC: 'Insert',
-    curses.KEY_DC: 'Delete',
-    curses.KEY_BACKSPACE: 'Backspace',
-    curses.ascii.TAB: 'Tab',
-    curses.ascii.LF: 'Enter',
-    curses.ascii.ESC: 'Escape',
+    curses.KEY_LEFT: "Left",
+    curses.KEY_RIGHT: "Right",
+    curses.KEY_UP: "Up",
+    curses.KEY_DOWN: "Down",
+    curses.KEY_PPAGE: "Page Up",
+    curses.KEY_NPAGE: "Page Down",
+    curses.KEY_HOME: "Home",
+    curses.KEY_END: "End",
+    curses.KEY_IC: "Insert",
+    curses.KEY_DC: "Delete",
+    curses.KEY_BACKSPACE: "Backspace",
+    curses.ascii.TAB: "Tab",
+    curses.ascii.LF: "Enter",
+    curses.ascii.ESC: "Escape",
 }
 
 ARGS = None
@@ -74,13 +76,15 @@ def wrapper(stdscr):
     else:
         midi_file = None
 
-    song = Song(midi_file=midi_file,
-                player=PLAYER,
-                ticks_per_beat=ARGS.ticks_per_beat,
-                cols_per_beat=ARGS.cols_per_beat,
-                beats_per_measure=ARGS.beats_per_measure,
-                key=NAME_TO_NUMBER[ARGS.key],
-                scale_name=ARGS.scale)
+    song = Song(
+        midi_file=midi_file,
+        player=PLAYER,
+        ticks_per_beat=ARGS.ticks_per_beat,
+        cols_per_beat=ARGS.cols_per_beat,
+        beats_per_measure=ARGS.beats_per_measure,
+        key=NAME_TO_NUMBER[ARGS.key],
+        scale_name=ARGS.scale,
+    )
 
     if PLAYER is not None:
         playback_thread = Thread(target=PLAYER.play_song, args=[song])
@@ -91,7 +95,7 @@ def wrapper(stdscr):
     try:
         Interface(song, PLAYER, ARGS.file, ARGS.unicode).main(stdscr)
     except Exception:
-        with open(CRASH_FILE, 'w') as crash_file:
+        with open(CRASH_FILE, "w") as crash_file:
             crash_file.write(format_exc())
     finally:
         curses.cbreak()
@@ -105,105 +109,126 @@ def wrapper(stdscr):
 
 
 def print_keymap():
-    print('MusiCLI Keybindings:')
+    print("MusiCLI Keybindings:")
     for key, action in KEYMAP.items():
         key_name = CURSES_KEY_NAMES.get(key)
         if key_name is None:
             key_name = chr(key)
-        print(f'\t{key_name}: {action.value}')
+        print(f"\t{key_name}: {action.value}")
     print()
-    print('NOTE: All alphanumeric keys map to notes in insert mode.')
-    print('Refer to the left sidebar in the editor to see this mapping.')
+    print("NOTE: All alphanumeric keys map to notes in insert mode.")
+    print("Refer to the left sidebar in the editor to see this mapping.")
 
 
 def positive_int(value):
     int_value = int(value)
     if int_value <= 0:
-        raise ArgumentTypeError(f'must be a positive integer; was {int_value}')
+        raise ArgumentTypeError(f"must be a positive integer; was {int_value}")
     return int_value
 
 
 def short_int(value):
     int_value = int(value)
     if not 0 <= int_value < 128:
-        raise ArgumentTypeError('must be an integer from 0-127; was '
-                                f'{int_value}')
+        raise ArgumentTypeError(
+            "must be an integer from 0-127; was " f"{int_value}"
+        )
     return int_value
 
 
 def optional_file(value):
     if os.path.isdir(value):
-        raise ArgumentTypeError(f'file cannot be a directory; was {value}')
+        raise ArgumentTypeError(f"file cannot be a directory; was {value}")
     if os.path.exists(value):
-        with open(value, 'r') as file:
+        with open(value, "r") as file:
             if not file.readable():
-                raise ArgumentTypeError(f'cannot read {value}')
+                raise ArgumentTypeError(f"cannot read {value}")
     return value
 
 
 def main():
     # Parse arguments
-    parser = ArgumentParser(
-            description='A MIDI sequencer for the terminal')
+    parser = ArgumentParser(description="A MIDI sequencer for the terminal")
     parser.add_argument(
-            '-H', '--keymap',
-            action='store_true',
-            help='show the list of keybindings and exit')
+        "-H",
+        "--keymap",
+        action="store_true",
+        help="show the list of keybindings and exit",
+    )
     parser.add_argument(
-            'file',
-            type=optional_file,
-            nargs='?',
-            help='MIDI file to read input from and write output to')
+        "file",
+        type=optional_file,
+        nargs="?",
+        help="MIDI file to read input from and write output to",
+    )
     parser.add_argument(
-            '-i', '--import',
-            dest='import_file',
-            type=FileType('r'),
-            help='MIDI file to import from; overrides the file argument for '
-                 'importing')
+        "-i",
+        "--import",
+        dest="import_file",
+        type=FileType("r"),
+        help=(
+            "MIDI file to import from; overrides the file argument for "
+            "importing"
+        ),
+    )
     parser.add_argument(
-            '-f', '--soundfont',
-            type=FileType('r'),
-            help='SF2 soundfont file to use for playback')
+        "-f",
+        "--soundfont",
+        type=FileType("r"),
+        help="SF2 soundfont file to use for playback",
+    )
     parser.add_argument(
-            '--ticks-per-beat',
-            type=positive_int,
-            help='MIDI ticks per beat (quarter note)')
+        "--ticks-per-beat",
+        type=positive_int,
+        help="MIDI ticks per beat (quarter note)",
+    )
     parser.add_argument(
-            '--cols-per-beat',
-            type=positive_int,
-            default=DEFAULT_COLS_PER_BEAT,
-            help='the number of subdivisions per beat to display in MusiCLI')
+        "--cols-per-beat",
+        type=positive_int,
+        default=DEFAULT_COLS_PER_BEAT,
+        help="the number of subdivisions per beat to display in MusiCLI",
+    )
     parser.add_argument(
-            '--beats-per-measure',
-            type=positive_int,
-            default=DEFAULT_BEATS_PER_MEASURE,
-            help='the number of beats per measure to display in MusiCLI')
+        "--beats-per-measure",
+        type=positive_int,
+        default=DEFAULT_BEATS_PER_MEASURE,
+        help="the number of beats per measure to display in MusiCLI",
+    )
     parser.add_argument(
-            '--key',
-            type=str,
-            choices=NAME_TO_NUMBER.keys(),
-            default=COMMON_NAMES[DEFAULT_KEY],
-            help='the key of the song to display in MusiCLI')
+        "--key",
+        type=str,
+        choices=NAME_TO_NUMBER.keys(),
+        default=COMMON_NAMES[DEFAULT_KEY],
+        help="the key of the song to display in MusiCLI",
+    )
     parser.add_argument(
-            '--scale',
-            choices=SCALES.keys(),
-            default='major',
-            help='the scale of the song to display in MusiCLI')
+        "--scale",
+        choices=SCALES.keys(),
+        default="major",
+        help="the scale of the song to display in MusiCLI",
+    )
     parser.add_argument(
-            '-u', '--unicode',
-            dest='unicode',
-            action='store_true',
-            help='enable unicode characters (default)')
+        "-u",
+        "--unicode",
+        dest="unicode",
+        action="store_true",
+        help="enable unicode characters (default)",
+    )
     parser.add_argument(
-            '-U', '--no-unicode',
-            dest='unicode',
-            action='store_false',
-            help='disable unicode characters')
+        "-U",
+        "--no-unicode",
+        dest="unicode",
+        action="store_false",
+        help="disable unicode characters",
+    )
     parser.add_argument(
-            '--crash-file',
-            type=FileType('w'),
-            help='file to write debugging info to in the event of a crash; '
-                 'set to /dev/null to disable the crash file')
+        "--crash-file",
+        type=FileType("w"),
+        help=(
+            "file to write debugging info to in the event of a crash; "
+            "set to /dev/null to disable the crash file"
+        ),
+    )
     parser.set_defaults(unicode=True)
 
     global ARGS
@@ -223,30 +248,30 @@ def main():
     elif ARGS.file or ARGS.import_file:
         print(ERROR_MIDO)
         print()
-        print('Try running:')
-        print('pip3 install mido')
+        print("Try running:")
+        print("pip3 install mido")
         sys.exit(1)
 
     if IMPORT_FLUIDSYNTH:
         if ARGS.soundfont:
             ARGS.soundfont = ARGS.soundfont.name
         elif os.path.isfile(DEFAULT_SOUNDFONT):
-            with open(DEFAULT_SOUNDFONT, 'r') as default_soundfont:
+            with open(DEFAULT_SOUNDFONT, "r") as default_soundfont:
                 if default_soundfont.readable():
                     ARGS.soundfont = DEFAULT_SOUNDFONT
     elif ARGS.soundfont:
         print(ERROR_FLUIDSYNTH)
         print()
-        print('Make sure FluidSynth itself is installed:')
-        print('https://www.fluidsynth.org/download/')
-        print('Then try running:')
-        print('pip3 install pyfluidsynth')
+        print("Make sure FluidSynth itself is installed:")
+        print("https://www.fluidsynth.org/download/")
+        print("Then try running:")
+        print("pip3 install pyfluidsynth")
         sys.exit(1)
 
     if ARGS.soundfont is not None and IMPORT_FLUIDSYNTH:
         global PLAYER
         PLAYER = Player(ARGS.soundfont)
 
-    os.environ.setdefault('ESCDELAY', str(ESCDELAY))
+    os.environ.setdefault("ESCDELAY", str(ESCDELAY))
 
     curses.wrapper(wrapper)
