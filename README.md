@@ -10,8 +10,6 @@ MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch b
 MusiCLI 2.0 presents a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
 The tag `v2.0.0` marks the state of MusiCLI at the end of the hackathon.
 
-![Screenshot](screenshot.png)
-
 ## Setup
 
 - Python 3
