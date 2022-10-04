@@ -90,6 +90,8 @@ class Player:
 
                 if song.dirty:
                     event_index = song.get_next_index(self.playhead)
+                    if event_index >= len(song):
+                        break
                     next_event = song[event_index]
                     song.dirty = False
 
