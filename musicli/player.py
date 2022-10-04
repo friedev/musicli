@@ -17,6 +17,7 @@
 import sys
 from threading import Event
 from time import sleep
+from traceback import format_exc
 
 from mido import tempo2bpm
 
@@ -109,7 +110,8 @@ class Player:
                     song.dirty = False
 
                 while (
-                    event_index < len(song) and self.playhead == next_event.time
+                    event_index < len(song)
+                    and self.playhead == next_event.time
                 ):
                     if isinstance(next_event, Note):
                         if next_event.on:
@@ -137,3 +139,13 @@ class Player:
 
             for note in active_notes:
                 self.stop_note(note)
+
+    def try_play_song(self, song, crash_file):
+        try:
+            self.play_song(song)
+        except Exception:
+            with open(crash_file, "w") as crash_file:
+                crash_file.write(format_exc())
+        finally:
+            KILL_EVENT.set()
+            sys.exit(1)

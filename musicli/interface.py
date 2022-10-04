@@ -18,8 +18,9 @@ import curses
 import curses.ascii
 from enum import Enum
 from math import inf
+import sys
 
-from .player import PLAY_EVENT, RESTART_EVENT
+from .player import PLAY_EVENT, RESTART_EVENT, KILL_EVENT
 from .song import (
     Note,
     number_to_name,
@@ -1270,6 +1271,9 @@ class Interface:
                 self.window.refresh()
 
             input_code = self.window.getch()
+
+            if KILL_EVENT.is_set():
+                sys.exit(1)
 
             redraw = input_code != curses.ERR or (
                 PLAY_EVENT.is_set()

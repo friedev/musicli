@@ -87,14 +87,18 @@ def wrapper(stdscr):
     )
 
     if PLAYER is not None:
-        playback_thread = Thread(target=PLAYER.play_song, args=[song])
+        playback_thread = Thread(
+            target=PLAYER.try_play_song, args=[song, CRASH_FILE]
+        )
         playback_thread.start()
     else:
         playback_thread = None
 
+    status = 0
     try:
         Interface(song, PLAYER, ARGS.file, ARGS.unicode).main(stdscr)
     except Exception:
+        status = 1
         with open(CRASH_FILE, "w") as crash_file:
             crash_file.write(format_exc())
     finally:
@@ -105,7 +109,7 @@ def wrapper(stdscr):
             playback_thread.join()
         if PLAYER is not None:
             PLAYER.synth.delete()
-        sys.exit(0)
+        sys.exit(status)
 
 
 def print_keymap():
@@ -271,6 +275,10 @@ def main():
     if ARGS.soundfont is not None and IMPORT_FLUIDSYNTH:
         global PLAYER
         PLAYER = Player(ARGS.soundfont)
+
+    global CRASH_FILE
+    if ARGS.crash_file is not None:
+        CRASH_FILE = ARGS.crash_file
 
     os.environ.setdefault("ESCDELAY", str(ESCDELAY))
 
