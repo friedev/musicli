@@ -5,7 +5,7 @@ from traceback import format_exc
 
 from mido import tempo2bpm
 
-from .song import MessageEvent, Note, DEFAULT_BPM
+from .song import MessageEvent, Note, Song, DEFAULT_BPM
 
 try:
     from fluidsynth import Synth
@@ -21,7 +21,12 @@ KILL_EVENT = Event()
 
 
 class Player:
-    def __init__(self, soundfont):
+    synth: Synth
+    soundfont: int
+    playhead: int
+    restart_time: int
+
+    def __init__(self, soundfont: str):
         self.synth = Synth()
         self.synth.start()
         self.soundfont = self.synth.sfload(soundfont)
@@ -30,22 +35,22 @@ class Player:
         self.restart_time = 0
 
     @property
-    def playing(self):
+    def playing(self) -> bool:
         return PLAY_EVENT.is_set()
 
-    def stop_note(self, note):
+    def stop_note(self, note: Note) -> None:
         self.synth.noteoff(note.channel, note.number)
 
-    def play_note(self, note):
+    def play_note(self, note: Note) -> None:
         if note.on:
             self.synth.noteon(note.channel, note.number, note.velocity)
         else:
             self.stop_note(note)
 
-    def set_instrument(self, channel, bank, instrument):
+    def set_instrument(self, channel: int, bank: int, instrument: int) -> None:
         self.synth.program_select(channel, self.soundfont, bank, instrument)
 
-    def play_song(self, song):
+    def play_song(self, song: Song) -> None:
         while True:
             bpm = DEFAULT_BPM
 
@@ -96,8 +101,7 @@ class Player:
                     song.dirty = False
 
                 while (
-                    event_index < len(song)
-                    and self.playhead == next_event.time
+                    event_index < len(song) and self.playhead == next_event.time
                 ):
                     if isinstance(next_event, Note):
                         if next_event.on:
@@ -126,11 +130,11 @@ class Player:
             for note in active_notes:
                 self.stop_note(note)
 
-    def try_play_song(self, song, crash_file):
+    def try_play_song(self, song, crash_file_path):
         try:
             self.play_song(song)
         except Exception:
-            with open(crash_file, "w") as crash_file:
+            with open(crash_file_path, "w") as crash_file:
                 crash_file.write(format_exc())
         finally:
             KILL_EVENT.set()

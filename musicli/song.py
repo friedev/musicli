@@ -1,4 +1,10 @@
+from __future__ import annotations
 from bisect import bisect_left, bisect_right, insort
+from dataclasses import dataclass
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import Player
 
 try:
     from mido import Message, MidiFile, MidiTrack
@@ -23,7 +29,7 @@ DRUM_BANK = 128
 DRUM_INSTRUMENT = 0
 DRUM_OFFSET = 35
 
-NAME_TO_NUMBER = {
+NAME_TO_NUMBER: dict[str, int] = {
     "C": 0,
     "C#": 1,
     "Db": 1,
@@ -43,10 +49,10 @@ NAME_TO_NUMBER = {
     "B": 11,
 }
 
-SHARP_KEYS = ("G", "D", "A", "E", "B", "F#", "C#")
-FLAT_KEYS = ("F", "Bb", "Eb", "Ab", "Db", "Gb")
+SHARP_KEYS: tuple[str, ...] = ("G", "D", "A", "E", "B", "F#", "C#")
+FLAT_KEYS: tuple[str, ...] = ("F", "Bb", "Eb", "Ab", "Db", "Gb")
 
-COMMON_NAMES = (
+COMMON_NAMES: tuple[str, ...] = (
     "C",
     "C#",
     "D",
@@ -61,7 +67,7 @@ COMMON_NAMES = (
     "B",
 )
 
-SHARP_NAMES = (
+SHARP_NAMES: tuple[str, ...] = (
     "C",
     "C#",
     "D",
@@ -76,7 +82,7 @@ SHARP_NAMES = (
     "B",
 )
 
-FLAT_NAMES = (
+FLAT_NAMES: tuple[str, ...] = (
     "C",
     "Db",
     "D",
@@ -93,7 +99,7 @@ FLAT_NAMES = (
 
 # Adapted from:
 # https://en.wikipedia.org/wiki/List_of_musical_scales_and_modes
-SCALES = {
+SCALES: dict[str, tuple[int, ...]] = {
     "major": (0, 2, 4, 5, 7, 9, 11),
     "major_pentatonic": (0, 2, 4, 7, 9),
     "minor": (0, 2, 3, 5, 7, 8, 10),
@@ -109,7 +115,7 @@ SCALES = {
 # https://en.wikipedia.org/wiki/List_of_chords
 # https://en.wikipedia.org/wiki/Chord_names_and_symbols_(popular_music)
 # TODO add more obscure chords from the second link
-CHORDS = {
+CHORDS: dict[tuple[int, ...], tuple[str, str]] = {
     (0, 1): ("ii", "minor second"),
     (0, 2): ("II", "major second"),
     (0, 3): ("iii", "minor third"),
@@ -139,7 +145,7 @@ CHORDS = {
 
 # Adapted from:
 # https://en.wikipedia.org/wiki/General_MIDI#Program_change_events
-INSTRUMENT_NAMES = [
+INSTRUMENT_NAMES: list[str] = [
     "Grand Piano",
     "Bright Grand Piano",
     "Electric Grand Piano",
@@ -273,7 +279,7 @@ INSTRUMENT_NAMES = [
 # Adapted from:
 # https://en.wikipedia.org/wiki/General_MIDI#Percussion
 # Offset by DRUM_OFFSET
-DRUM_NAMES = [
+DRUM_NAMES: list[tuple[str, str]] = [
     ("ABass", "Acoustic Bass Drum"),
     ("EBass", "Electric Bass Drum"),
     ("SStick", "Side Stick"),
@@ -334,7 +340,9 @@ DEFAULT_KEY = 0
 DEFAULT_SCALE_NAME = "major"
 
 
-def number_to_name(number, scale=None, octave=True):
+def number_to_name(
+    number: int, scale: Optional[str] = None, octave: bool = True
+) -> str:
     semitone = number % NOTES_PER_OCTAVE
     if scale in SHARP_KEYS:
         letter = SHARP_NAMES[semitone]
@@ -344,11 +352,11 @@ def number_to_name(number, scale=None, octave=True):
         letter = COMMON_NAMES[semitone]
     if not octave:
         return letter
-    octave = number // NOTES_PER_OCTAVE - 1
-    return f"{letter}{octave}"
+    octave_str = number // NOTES_PER_OCTAVE - 1
+    return f"{letter}{octave_str}"
 
 
-def name_to_number(name):
+def name_to_number(name: str) -> int:
     number = NAME_TO_NUMBER.get(name[:2])
     if number is None:
         number = NAME_TO_NUMBER.get(name[:1])
@@ -367,81 +375,90 @@ def name_to_number(name):
 
 
 class Track:
-    def __init__(self, channel):
+    channel: int
+    instrument: int
+
+    def __init__(self, channel, instrument):
         self.channel = channel
-        self.instrument = None
+        self.instrument = instrument
 
     @property
-    def is_drum(self):
+    def is_drum(self) -> bool:
         return self.channel == DRUM_CHANNEL
 
     @property
-    def bank(self):
+    def bank(self) -> int:
         return DRUM_BANK if self.is_drum else DEFAULT_BANK
 
     @property
-    def instrument_name(self):
+    def instrument_name(self) -> str:
         if self.is_drum:
             return "Drums"
         return INSTRUMENT_NAMES[self.instrument]
 
-    def register(self, player):
+    def register(self, player: Player) -> None:
         player.set_instrument(self.channel, self.bank, self.instrument)
 
-    def set_channel(self, channel, player=None):
+    def set_channel(self, channel: int, player: Optional[Player] = None):
         self.channel = channel
         if player is not None:
             self.register(player)
 
-    def set_instrument(self, instrument, player=None):
+    def set_instrument(self, instrument: int, player: Optional[Player] = None):
         self.instrument = instrument
         if player is not None:
             self.register(player)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Channel {self.channel}: {self.instrument_name}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Track(channel={self.channel})"
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.channel)
 
 
+@dataclass(init=False)
 class SongEvent:
-    def __init__(self, time, track=None):
+    time: int
+    track: Track
+
+    def __init__(self, time: int, track: Track):
         if time < 0:
             raise ValueError(f"Time must be non-negative; was {time}")
 
         self.time = time
         self.track = track
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         return self.time < other.time
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         return self.time > other.time
 
-    def __repr__(self):
-        return f"SongEvent(time={self.time}, track={self.track})"
 
-
+@dataclass(init=False)
 class BaseNote(SongEvent):
-    def __init__(self, time, track=None, number=0):
+    time: int
+    track: Track
+    number: int
+
+    def __init__(self, time: int, track: Track, number: int = 0):
         super().__init__(time, track)
         self.number = number
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         if isinstance(other, BaseNote) and self.time == other.time:
             return self.number < other.number
         return super().__lt__(other)
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         if isinstance(other, BaseNote) and self.time == other.time:
             return self.number > other.number
         return super().__gt__(other)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"BaseNote(time={self.time}, "
             f"track={self.track}, "
@@ -450,14 +467,21 @@ class BaseNote(SongEvent):
 
 
 class Note(BaseNote):
+    on: bool
+    number: int
+    time: int
+    track: Track
+    velocity: int
+    pair: Optional[Note]
+
     def __init__(
         self,
-        on,
-        number,
-        time,
-        track,
-        velocity=DEFAULT_VELOCITY,
-        duration=None,
+        on: bool,
+        number: int,
+        time: int,
+        track: Track,
+        velocity: int = DEFAULT_VELOCITY,
+        duration: Optional[int] = None,
     ):
         super().__init__(time, track, number)
 
@@ -470,7 +494,7 @@ class Note(BaseNote):
                 raise ValueError(f"Duration must be positive; was {duration}")
             self.make_pair(time + duration if on else time - duration)
 
-    def make_pair(self, time):
+    def make_pair(self, time: int) -> None:
         if time < 0:
             raise ValueError(f"Time must be non-negative; was {time}")
 
@@ -492,42 +516,46 @@ class Note(BaseNote):
         self.pair.pair = self
 
     @property
-    def on_pair(self):
+    def on_pair(self) -> Note:
+        if self.pair is None:
+            raise ValueError(f"{repr(self)} is not part of a pair")
         return self if self.on else self.pair
 
     @property
-    def off_pair(self):
+    def off_pair(self) -> Note:
+        if self.pair is None:
+            raise ValueError(f"{repr(self)} is not part of a pair")
         return self.pair if self.on else self
 
     @property
-    def start(self):
+    def start(self) -> int:
         return self.on_pair.time
 
     @property
-    def end(self):
+    def end(self) -> int:
         return self.off_pair.time
 
     @property
-    def duration(self):
+    def duration(self) -> int:
         return self.off_pair.time - self.on_pair.time
 
     @property
-    def semitone(self):
+    def semitone(self) -> int:
         return self.number % NOTES_PER_OCTAVE
 
     @property
-    def octave(self):
+    def octave(self) -> int:
         return self.number // NOTES_PER_OCTAVE - 1
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.name_in_key(None, octave=False)
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         return self.name_in_key(None, octave=True)
 
-    def name_in_key(self, key, octave=False):
+    def name_in_key(self, key: Optional[str], octave: bool = False) -> str:
         if self.is_drum:
             drum_number = self.number - DRUM_OFFSET
             if 0 <= drum_number < len(DRUM_NAMES):
@@ -539,29 +567,25 @@ class Note(BaseNote):
         return number_to_name(self.number, key, octave=octave)
 
     @property
-    def channel(self):
+    def channel(self) -> int:
         return self.track.channel
 
     @property
-    def is_drum(self):
+    def is_drum(self) -> bool:
         return self.track.is_drum
 
     @property
-    def instrument(self):
+    def instrument(self) -> int:
         return self.track.instrument
 
     @property
-    def instrument_name(self):
+    def instrument_name(self) -> str:
         if self.is_drum:
             _, drum_name = DRUM_NAMES[self.number - DRUM_OFFSET]
             return drum_name
         return self.track.instrument_name
 
-    @property
-    def color_pair(self):
-        return self.track.color_pair
-
-    def move(self, time):
+    def move(self, time: int) -> None:
         if self.pair is not None:
             if self.on:
                 self.pair.time = time + self.duration
@@ -573,7 +597,7 @@ class Note(BaseNote):
                     )
         self.time = time
 
-    def set_duration(self, duration):
+    def set_duration(self, duration: int) -> None:
         if duration <= 0:
             raise ValueError(f"Duration must be positive; was {duration}")
 
@@ -584,7 +608,7 @@ class Note(BaseNote):
         else:
             self.off_pair.time = self.on_pair.time + duration
 
-    def set_velocity(self, velocity):
+    def set_velocity(self, velocity: int) -> None:
         if not 0 <= velocity < MAX_VELOCITY:
             raise ValueError(
                 "Velocity must be in the range "
@@ -595,7 +619,7 @@ class Note(BaseNote):
         if self.pair is not None:
             self.pair.velocity = velocity
 
-    def to_message(self, delta):
+    def to_message(self, delta: int) -> Message:
         message_type = "note_on" if self.on else "note_off"
         return Message(
             message_type,
@@ -605,10 +629,10 @@ class Note(BaseNote):
             channel=self.channel,
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.full_name} (Velocity: {self.velocity})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"Note(on={self.on}, "
             f"number={self.number}, "
@@ -680,7 +704,7 @@ def events_by_track(events):
     return tracks
 
 
-def events_to_messages(events):
+def events_to_messages(events) -> Message:
     messages = []
     last_time = 0
     for event in events:
@@ -694,25 +718,27 @@ def events_to_messages(events):
 class Song:
     def __init__(
         self,
-        midi_file=None,
-        player=None,
-        ticks_per_beat=None,
-        cols_per_beat=DEFAULT_COLS_PER_BEAT,
-        beats_per_measure=DEFAULT_BEATS_PER_MEASURE,
-        key=DEFAULT_KEY,
-        scale_name=DEFAULT_SCALE_NAME,
+        midi_file: Optional[str] = None,
+        player: Optional[Player] = None,
+        ticks_per_beat: Optional[int] = None,
+        cols_per_beat: int = DEFAULT_COLS_PER_BEAT,
+        beats_per_measure: int = DEFAULT_BEATS_PER_MEASURE,
+        key: int = DEFAULT_KEY,
+        scale_name: str = DEFAULT_SCALE_NAME,
     ):
         self.events = []
         self.tracks = []
-        self.ticks_per_beat = ticks_per_beat
+
+        if ticks_per_beat is None:
+            self.ticks_per_beat = DEFAULT_TICKS_PER_BEAT
+        else:
+            self.ticks_per_beat = ticks_per_beat
 
         if midi_file is not None:
             self.import_midi(midi_file, player)
         else:
             self.create_track(player=player)
 
-        if self.ticks_per_beat is None:
-            self.ticks_per_beat = DEFAULT_TICKS_PER_BEAT
         self.cols_per_beat = cols_per_beat
         self.beats_per_measure = beats_per_measure
         self.key = key
@@ -721,38 +747,38 @@ class Song:
         self.dirty = True
 
     @property
-    def key_name(self):
+    def key_name(self) -> str:
         return COMMON_NAMES[self.key]
 
     @property
-    def scale(self):
+    def scale(self) -> tuple[int, ...]:
         return SCALES[self.scale_name]
 
     @property
-    def events_by_track(self):
+    def events_by_track(self) -> list[SongEvent]:
         return events_by_track(self.events)
 
     @property
-    def start(self):
+    def start(self) -> int:
         return self[0].time if len(self.events) > 0 else 0
 
     @property
-    def end(self):
+    def end(self) -> int:
         return self[-1].time if len(self.events) > 0 else 0
 
-    def ticks_to_beats(self, ticks):
+    def ticks_to_beats(self, ticks: int) -> int:
         return ticks // self.ticks_per_beat
 
-    def beats_to_ticks(self, beats):
+    def beats_to_ticks(self, beats: int) -> int:
         return beats * self.ticks_per_beat
 
-    def ticks_to_cols(self, ticks):
+    def ticks_to_cols(self, ticks: int) -> int:
         return int(ticks / self.ticks_per_beat * self.cols_per_beat)
 
-    def cols_to_ticks(self, cols):
+    def cols_to_ticks(self, cols: int) -> int:
         return int(cols / self.cols_per_beat * self.ticks_per_beat)
 
-    def add_note(self, note, pair=True):
+    def add_note(self, note: Note, pair: bool = True) -> None:
         index = bisect_left(self.events, note)
         if (
             0 <= index < len(self)
@@ -767,7 +793,9 @@ class Song:
             insort(self.events, note.pair)
         self.dirty = True
 
-    def remove_note(self, note, pair=True, lookup=False):
+    def remove_note(
+        self, note: Note, pair: bool = True, lookup: bool = False
+    ) -> None:
         # Get the song note rather than the given note, since externally
         # created notes may have different pairs
         if lookup:
@@ -779,24 +807,26 @@ class Song:
             self.events.remove(note.pair)
         self.dirty = True
 
-    def move_note(self, note, time):
+    def move_note(self, note: Note, time: int) -> None:
         self.remove_note(note)
         note.move(time)
         self.add_note(note)
 
-    def set_duration(self, note, duration):
+    def set_duration(self, note: Note, duration: int) -> None:
         self.remove_note(note)
         note.set_duration(duration)
         self.add_note(note)
 
     def get_index(
         self,
-        time,
-        track=None,
-        note=False,
-        on=False,
-    ):
-        index = bisect_left(self, BaseNote(time))
+        time: int,
+        track: Optional[Track] = None,
+        note: bool = False,
+        on: bool = False,
+    ) -> int:
+        dummy_track = track if track is not None else self.tracks[0]
+        dummy_note = BaseNote(time, dummy_track)
+        index = bisect_left(self, dummy_note)  # type: ignore
         if not 0 <= index < len(self) or time != self[index].time:
             return len(self)
         while (
@@ -816,12 +846,14 @@ class Song:
 
     def get_previous_index(
         self,
-        time,
-        track=None,
-        note=False,
-        on=False,
-    ):
-        index = bisect_left(self, BaseNote(time)) - 1
+        time: int,
+        track: Optional[Track] = None,
+        note: bool = False,
+        on: bool = False,
+    ) -> int:
+        dummy_track = track if track is not None else self.tracks[0]
+        dummy_note = BaseNote(time, dummy_track)
+        index = bisect_left(self, dummy_note) - 1  # type: ignore
         if not 0 <= index < len(self) or time < self[index].time:
             return len(self)
         while index >= 0 and (
@@ -834,17 +866,20 @@ class Song:
 
     def get_next_index(
         self,
-        time,
-        track=None,
-        note=False,
-        on=False,
-        inclusive=True,
-    ):
+        time: int,
+        track: Optional[Track] = None,
+        note: bool = False,
+        on: bool = False,
+        inclusive: bool = True,
+    ) -> int:
         time = max(time, 0)
+        dummy_track = track if track is not None else self.tracks[0]
         if inclusive:
-            index = bisect_left(self, BaseNote(time))
+            dummy_note = BaseNote(time, dummy_track)
+            index = bisect_left(self, dummy_note)  # type: ignore
         else:
-            index = bisect_right(self, BaseNote(time, number=TOTAL_NOTES))
+            dummy_note = BaseNote(time, dummy_track, number=TOTAL_NOTES)
+            index = bisect_right(self, dummy_note)  # type: ignore
         if not 0 <= index < len(self) or time > self[index].time:
             return len(self)
         while index < len(self) and (
@@ -857,24 +892,26 @@ class Song:
 
     def get_note(
         self,
-        time,
-        track=None,
-        on=False,
-    ):
+        time: int,
+        track: Optional[Track] = None,
+        on: bool = False,
+    ) -> Optional[Note]:
         index = self.get_index(time, track, note=True, on=on)
         return self[index] if 0 <= index < len(self) else None
 
-    def get_previous_note(self, time, track=None, on=False):
+    def get_previous_note(
+        self, time: int, track: Optional[Track] = None, on: bool = False
+    ) -> Optional[Note]:
         index = self.get_previous_index(time, track, note=True, on=on)
         return self[index] if index >= 0 else None
 
     def get_next_note(
         self,
-        time,
-        track=None,
-        on=False,
-        inclusive=True,
-    ):
+        time: int,
+        track: Optional[Track] = None,
+        on: bool = False,
+        inclusive: bool = True,
+    ) -> Optional[Note]:
         index = self.get_next_index(
             time,
             track,
@@ -884,7 +921,7 @@ class Song:
         )
         return self[index] if index < len(self) else None
 
-    def get_chord(self, time, track=None):
+    def get_chord(self, time: int, track: Optional[Track] = None) -> list[Note]:
         index = self.get_index(time, track, on=True)
         if not 0 <= index < len(self):
             return []
@@ -901,7 +938,9 @@ class Song:
             index += 1
         return chord
 
-    def get_previous_chord(self, time, track=None):
+    def get_previous_chord(
+        self, time: int, track: Optional[Track] = None
+    ) -> list[Note]:
         index = self.get_previous_index(time, track, on=True)
         if not 0 <= index < len(self):
             return []
@@ -918,7 +957,9 @@ class Song:
             index -= 1
         return chord
 
-    def get_next_chord(self, time, track=None, inclusive=True):
+    def get_next_chord(
+        self, time: int, track: Optional[Track] = None, inclusive: bool = True
+    ) -> list[Note]:
         index = self.get_next_index(time, track, on=True, inclusive=inclusive)
         if not 0 <= index < len(self):
             return []
@@ -935,20 +976,20 @@ class Song:
             index += 1
         return chord
 
-    def get_events_in_track(self, track, notes=False):
-        event = []
+    def get_events_in_track(self, track: Track, notes: bool = False):
+        events = []
         for event in self.events:
-            if event.track is track and not notes or isinstance(event, Note):
-                notes.append(event)
-        return notes
+            if event.track is track and (not notes or isinstance(event, Note)):
+                events.append(event)
+        return events
 
-    def has_channel(self, channel):
+    def has_channel(self, channel: int) -> bool:
         for track in self.tracks:
             if track.channel == channel:
                 return True
         return False
 
-    def get_open_channel(self):
+    def get_open_channel(self) -> int:
         channels = set()
         for track in self.tracks:
             channels.add(track.channel)
@@ -959,13 +1000,13 @@ class Song:
 
     def create_track(
         self,
-        channel=None,
-        instrument=DEFAULT_INSTRUMENT,
-        player=None,
-    ):
+        channel: Optional[int] = None,
+        instrument: int = DEFAULT_INSTRUMENT,
+        player: Optional[Player] = None,
+    ) -> Track:
         if channel is None:
             channel = self.get_open_channel()
-        track = Track(channel)
+        track = Track(channel, instrument)
         track.set_instrument(instrument, player)
         self.tracks.append(track)
         self.dirty = True
@@ -973,11 +1014,11 @@ class Song:
 
     def get_track(
         self,
-        channel,
-        create=True,
-        instrument=DEFAULT_INSTRUMENT,
-        player=None,
-    ):
+        channel: int,
+        create: bool = True,
+        instrument: int = DEFAULT_INSTRUMENT,
+        player: Optional[Player] = None,
+    ) -> Optional[Track]:
         for track in self.tracks:
             if track.channel == channel:
                 return track
@@ -985,7 +1026,7 @@ class Song:
             return self.create_track(channel, instrument, player)
         return None
 
-    def delete_track(self, track):
+    def delete_track(self, track: Track) -> None:
         i = 0
         while i < len(self.events):
             if self[i].track is track:
@@ -994,36 +1035,38 @@ class Song:
                 i += 1
         self.tracks.remove(track)
 
-    def import_midi(self, infile_path, player=None):
+    def import_midi(self, infile_path: str, player: Optional[Player] = None):
         if not IMPORT_MIDO:
             raise ValueError(
-                "mido is required to import MIDI files " "(pip install mido)"
+                "mido is required to import MIDI files (pip install mido)"
             )
         infile = MidiFile(infile_path)
         self.ticks_per_beat = infile.ticks_per_beat
 
-        events = []
-        active_notes = []
+        events: list[SongEvent] = []
+        active_notes: list[Note] = []
         for track in infile.tracks:
             time = 0
             for message in track:
                 time += message.time
                 if message.type == "note_on" and message.velocity > 0:
+                    track = self.get_track(
+                        message.channel, create=True, player=player
+                    )
+                    assert track is not None
                     active_notes.append(
                         Note(
                             on=True,
                             number=message.note,
                             time=time,
                             velocity=message.velocity,
-                            track=self.get_track(
-                                message.channel, create=True, player=player
-                            ),
+                            track=track,
                         )
                     )
                 elif message.type == "note_off" or (
                     message.type == "note_on" and message.velocity == 0
                 ):
-                    for note in active_notes:
+                    for note in active_notes.copy():
                         if note.number == message.note:
                             duration = time - note.time
                             if duration == 0:
@@ -1031,6 +1074,7 @@ class Song:
                             else:
                                 note.set_duration(duration)
                                 events.append(note)
+                                assert note.pair is not None
                                 events.append(note.pair)
                                 active_notes.remove(note)
                                 break
@@ -1053,7 +1097,7 @@ class Song:
     def export_midi(self, filename):
         if not IMPORT_MIDO:
             raise ValueError(
-                "mido is required to export MIDI files " "(pip install mido)"
+                "mido is required to export MIDI files (pip install mido)"
             )
 
         outfile = MidiFile(ticks_per_beat=self.ticks_per_beat)

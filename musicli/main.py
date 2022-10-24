@@ -1,3 +1,4 @@
+import argparse
 from argparse import ArgumentParser, ArgumentTypeError, FileType
 import curses
 import curses.ascii
@@ -6,6 +7,7 @@ import os.path
 import sys
 from threading import Thread
 from traceback import format_exc
+from typing import Optional
 
 from .interface import Interface, ERROR_FLUIDSYNTH, ERROR_MIDO, KEYMAP
 from .song import (
@@ -27,7 +29,7 @@ CRASH_FILE = "crash.log"
 
 ESCDELAY = 25
 
-CURSES_KEY_NAMES = {
+CURSES_KEY_NAMES: dict[int, str] = {
     curses.KEY_LEFT: "Left",
     curses.KEY_RIGHT: "Right",
     curses.KEY_UP: "Up",
@@ -44,11 +46,11 @@ CURSES_KEY_NAMES = {
     curses.ascii.ESC: "Escape",
 }
 
-ARGS = None
-PLAYER = None
+ARGS: argparse.Namespace
+PLAYER: Optional[Player] = None
 
 
-def wrapper(stdscr):
+def wrapper(stdscr: curses.window) -> None:
     # Hide curses cursor
     curses.curs_set(0)
 
@@ -80,7 +82,8 @@ def wrapper(stdscr):
 
     status = 0
     try:
-        Interface(song, PLAYER, ARGS.file, ARGS.unicode).main(stdscr)
+        interface = Interface(stdscr, song, PLAYER, ARGS.file, ARGS.unicode)
+        interface.main()
     except Exception:
         status = 1
         with open(CRASH_FILE, "w") as crash_file:
@@ -96,7 +99,7 @@ def wrapper(stdscr):
         sys.exit(status)
 
 
-def print_keymap():
+def print_keymap() -> None:
     print("MusiCLI Keybindings:")
     for key, action in KEYMAP.items():
         key_name = CURSES_KEY_NAMES.get(key)
@@ -108,14 +111,14 @@ def print_keymap():
     print("Refer to the left sidebar in the editor to see this mapping.")
 
 
-def positive_int(value):
+def positive_int(value) -> int:
     int_value = int(value)
     if int_value <= 0:
         raise ArgumentTypeError(f"must be a positive integer; was {int_value}")
     return int_value
 
 
-def short_int(value):
+def short_int(value) -> int:
     int_value = int(value)
     if not 0 <= int_value < 128:
         raise ArgumentTypeError(
@@ -134,7 +137,7 @@ def optional_file(value):
     return value
 
 
-def main():
+def main() -> None:
     # Parse arguments
     parser = ArgumentParser(description="A MIDI sequencer for the terminal")
     parser.add_argument(

@@ -1,12 +1,18 @@
+from abc import ABC, abstractmethod
 import curses
 import curses.ascii
 from enum import Enum
+from dataclasses import dataclass
 from math import inf
 import sys
+from typing import Optional, Union
 
-from .player import PLAY_EVENT, RESTART_EVENT, KILL_EVENT
+from .player import Player, PLAY_EVENT, RESTART_EVENT, KILL_EVENT
+
 from .song import (
     Note,
+    Song,
+    Track,
     number_to_name,
     CHORDS,
     COMMON_NAMES,
@@ -100,7 +106,7 @@ class Action(Enum):
     QUIT_HELP = "does not quit; use Ctrl+C to exit MusiCLI"
 
 
-KEYMAP = {
+KEYMAP: dict[int, Action] = {
     ord("h"): Action.PAN_LEFT,
     ord("H"): Action.PAN_LEFT_SHORT,
     ord("l"): Action.PAN_RIGHT,
@@ -166,7 +172,7 @@ KEYMAP = {
     ord("Q"): Action.QUIT_HELP,
 }
 
-INSERT_KEYMAP = {
+INSERT_KEYMAP: dict[str, int] = {
     "z": 0,  # C
     "s": 1,  # C#
     "x": 2,  # D
@@ -198,7 +204,7 @@ INSERT_KEYMAP = {
     "p": 28,  # E
 }
 
-SYMBOLS_TO_NUMBERS = {
+SYMBOLS_TO_NUMBERS: dict[str, str] = {
     "!": "1",
     "@": "2",
     "#": "3",
@@ -214,7 +220,7 @@ SYMBOLS_TO_NUMBERS = {
 INSERT_KEYLIST = tuple(INSERT_KEYMAP.keys())
 
 
-def init_color_pairs():
+def init_color_pairs() -> None:
     global COLOR_GRAY
 
     try:
@@ -231,23 +237,21 @@ def init_color_pairs():
     curses.init_pair(PAIR_LINE, COLOR_GRAY, -1)
     curses.init_pair(PAIR_PLAYHEAD, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(PAIR_STATUS_NORMAL, curses.COLOR_BLACK, curses.COLOR_BLUE)
-    curses.init_pair(
-        PAIR_STATUS_INSERT, curses.COLOR_BLACK, curses.COLOR_GREEN
-    )
+    curses.init_pair(PAIR_STATUS_INSERT, curses.COLOR_BLACK, curses.COLOR_GREEN)
     curses.init_pair(PAIR_LAST_NOTE, curses.COLOR_BLACK, curses.COLOR_WHITE)
     curses.init_pair(PAIR_LAST_CHORD, curses.COLOR_BLACK, COLOR_GRAY)
     curses.init_pair(PAIR_HIGHLIGHT, curses.COLOR_BLACK, curses.COLOR_WHITE)
 
 
-def format_velocity(velocity):
+def format_velocity(velocity: int) -> str:
     return f"Velocity: {velocity}"
 
 
-def format_track(index, track):
+def format_track(index: int, track: Track) -> str:
     return f"Track {index + 1}: {track.instrument_name}"
 
 
-def format_notes(notes):
+def format_notes(notes: list[Note]) -> tuple[str, str]:
     if len(notes) == 1:
         return notes[0].full_name, str(notes[0])
 
@@ -291,33 +295,49 @@ def format_notes(notes):
     return short_string, long_string
 
 
-class FillerBlock:
-    def __init__(self, attr=curses.A_NORMAL):
-        self.attr = attr
-        self.short = False
+class Block(ABC):
+    short: bool
+
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
+
+    @abstractmethod
+    def __lt__(self, other) -> bool:
+        pass
+
+    @abstractmethod
+    def __gt__(self, other) -> bool:
+        pass
+
+
+@dataclass
+class FillerBlock(Block):
+    attr: int = curses.A_NORMAL
+    short: bool = False
 
     @property
-    def priority(self):
+    def priority(self) -> float:
         return inf
 
-    def __len__(self):
+    def __len__(self) -> int:
         return 0
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         return False
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         return True
 
 
-class StatusBlock:
+class StatusBlock(Block):
     def __init__(
         self,
-        string,
-        short_string=None,
-        attr=curses.A_NORMAL,
-        priority=0,
-        pad=True,
+        string: str,
+        short_string: Optional[str] = None,
+        attr: int = curses.A_NORMAL,
+        priority: int = 0,
+        pad: bool = True,
     ):
         if short_string is None:
             short_string = string
@@ -331,22 +351,51 @@ class StatusBlock:
         self.attr = attr
         self.short = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.short_string if self.short else self.string
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(str(self))
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         return self.priority < other.priority
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         return self.priority > other.priority
 
 
 class Interface:
-    def __init__(self, song, player=None, filename=None, unicode=True):
+    window: curses.window
+    song: Song
+    player: Optional[Player]
+    x_offset: int
+    y_offset: int
+    insert: bool
+    time: int
+    duration: int
+    velocity: int
+    track_index: int
+    octave: int
+    last_note: Optional[Note]
+    last_chord: list[Note]
+    message: str
+    filename: Optional[str]
+    unicode: bool
+    highlight_track: bool
+    focus_track: bool
+    repeat_count: int
+
+    def __init__(
+        self,
+        window: curses.window,
+        song: Song,
+        player: Optional[Player] = None,
+        filename: Optional[str] = None,
+        unicode: bool = True,
+    ):
+        self.window = window
         self.song = song
+        self.player = player
 
         self.insert = False
         self.time = 0
@@ -356,71 +405,66 @@ class Interface:
         self.octave = DEFAULT_OCTAVE
         self.last_note = None
         self.last_chord = []
-
-        self.window = None
-        self.x_offset = self.min_x_offset
-        self.y_offset = self.min_y_offset
-
         self.message = ""
-        self.player = player
         self.filename = filename
         self.unicode = unicode
         self.highlight_track = False
         self.focus_track = False
         self.repeat_count = 0
 
+        self.x_offset = self.min_x_offset
+        self.y_offset = (
+            DEFAULT_OCTAVE + 1
+        ) * NOTES_PER_OCTAVE - self.height // 2
+
         init_color_pairs()
 
     @property
-    def width(self):
+    def width(self) -> int:
         return self.window.getmaxyx()[1]
 
     @property
-    def height(self):
+    def height(self) -> int:
         return self.window.getmaxyx()[0]
 
     @property
-    def x_sidebar_offset(self):
+    def x_sidebar_offset(self) -> int:
         return -9 if self.track.is_drum else -6
 
     @property
-    def min_x_offset(self):
+    def min_x_offset(self) -> int:
         return self.x_sidebar_offset
 
     @property
-    def min_y_offset(self):
+    def min_y_offset(self) -> int:
         return -2
 
     @property
-    def max_y_offset(self):
+    def max_y_offset(self) -> int:
         if self.window is not None:
             return TOTAL_NOTES - self.height
         return TOTAL_NOTES
 
     @property
-    def key(self):
+    def key(self) -> str:
         return COMMON_NAMES[self.song.key]
 
     @property
-    def track(self):
+    def track(self) -> Track:
         return self.song.tracks[self.track_index]
 
     @property
-    def instrument(self):
+    def instrument(self) -> int:
         return self.track.instrument
 
-    def init_window(self, window):
-        self.window = window
-        self.y_offset = (
-            DEFAULT_OCTAVE + 1
-        ) * NOTES_PER_OCTAVE - self.height // 2
-
-    def draw_line(self, x, string, attr, start_y=1):
+    def draw_line(
+        self, x: int, string: str, attr: int, start_y: int = 1
+    ) -> None:
         if 0 <= x and x + len(string) < self.width:
             for y in range(start_y, self.height):
                 self.window.addstr(y, x, string, attr)
 
-    def draw_scale_dots(self):
+    def draw_scale_dots(self) -> None:
         string = "·" if self.unicode else "."
         attr = curses.color_pair(PAIR_LINE)
         for y, note in enumerate(
@@ -434,10 +478,8 @@ class Interface:
                 for x in range(-self.x_offset % 4, self.width - 1, 4):
                     self.window.addstr(self.height - y - 1, x, string, attr)
 
-    def draw_measures(self):
-        cols_per_measure = (
-            self.song.cols_per_beat * self.song.beats_per_measure
-        )
+    def draw_measures(self) -> None:
+        cols_per_measure = self.song.cols_per_beat * self.song.beats_per_measure
         string = "▏" if self.unicode else "|"
         attr = curses.color_pair(PAIR_LINE)
         for x in range(
@@ -447,14 +489,14 @@ class Interface:
             measure_number = (x + self.x_offset) // cols_per_measure + 1
             self.window.addstr(0, x, str(measure_number), attr)
 
-    def draw_cursor(self):
+    def draw_cursor(self) -> None:
         self.draw_line(
             self.song.ticks_to_cols(self.time) - self.x_offset,
             "▏" if self.unicode else "|",
             curses.color_pair(0),
         )
 
-    def draw_playhead(self):
+    def draw_playhead(self) -> None:
         if self.player is not None:
             self.draw_line(
                 self.song.ticks_to_cols(self.player.playhead) - self.x_offset,
@@ -462,7 +504,7 @@ class Interface:
                 curses.color_pair(PAIR_PLAYHEAD),
             )
 
-    def draw_notes(self):
+    def draw_notes(self) -> None:
         time = self.song.cols_to_ticks(self.x_offset)
         index = self.song.get_next_index(time)
         string = "▏" if self.unicode else "["
@@ -516,7 +558,7 @@ class Interface:
                     y, start_x + 1, note.name[:string_width], attr
                 )
 
-    def draw_sidebar(self):
+    def draw_sidebar(self) -> None:
         pair_note = curses.color_pair(PAIR_SIDEBAR_NOTE)
         pair_key = curses.color_pair(PAIR_SIDEBAR_KEY)
         for y, number in enumerate(
@@ -546,7 +588,7 @@ class Interface:
                     pair_key,
                 )
 
-    def draw_status_block(self, x, block, length):
+    def draw_status_block(self, x: int, block, length: int) -> int:
         if isinstance(block, FillerBlock):
             filler_width = self.width - length - 1
             string = " " * filler_width
@@ -559,7 +601,7 @@ class Interface:
             self.window.addstr(self.height - 2, x, string, block.attr)
         return new_x
 
-    def draw_status_bar(self):
+    def draw_status_bar(self) -> None:
         if len(self.message) == 0 and len(self.last_chord) > 0:
             short_notes, long_notes = format_notes(self.last_chord)
             self.message = (
@@ -582,7 +624,7 @@ class Interface:
                 curses.color_pair(0),
             )
 
-        bar = []
+        bar: list[Block] = []
 
         color = curses.color_pair(
             PAIR_STATUS_INSERT if self.insert else PAIR_STATUS_NORMAL
@@ -672,7 +714,7 @@ class Interface:
             )
         )
 
-        length = sum([len(block) for block in bar])
+        length = sum(len(block) for block in bar)
         if length >= self.width:
             priority_order = sorted(bar)
             for block in priority_order:
@@ -688,7 +730,7 @@ class Interface:
             if x >= self.width:
                 return
 
-    def draw(self):
+    def draw(self) -> None:
         self.draw_scale_dots()
         self.draw_measures()
         self.draw_cursor()
@@ -697,51 +739,54 @@ class Interface:
         self.draw_sidebar()
         self.draw_status_bar()
 
-    def play_note(self, note=None):
+    def play_note(self, note: Optional[Note] = None) -> None:
         if note is None:
             note = self.last_note
-        if self.player is not None and not self.player.playing:
+        if (
+            note is not None
+            and self.player is not None
+            and not self.player.playing
+        ):
             self.player.play_note(note)
 
-    def stop_note(self, note=None):
+    def stop_note(self, note: Optional[Note] = None) -> None:
         if note is None:
             note = self.last_note
-        if self.player is not None and not self.player.playing:
+        if (
+            note is not None
+            and self.player is not None
+            and not self.player.playing
+        ):
             self.player.stop_note(note)
 
-    def play_notes(self, notes=None):
+    def play_notes(self, notes: Optional[list[Note]] = None) -> None:
         if notes is None:
             notes = self.last_chord
         if self.player is not None and not self.player.playing:
             for note in notes:
                 self.player.play_note(note)
 
-    def stop_notes(self, notes=None):
+    def stop_notes(self, notes: Optional[list[Note]] = None):
         if notes is None:
             notes = self.last_chord
         if self.player is not None and not self.player.playing:
             for note in notes:
                 self.player.stop_note(note)
 
-    def set_x_offset(self, x_offset):
+    def set_x_offset(self, x_offset: int) -> None:
         self.x_offset = max(x_offset, self.min_x_offset)
 
-    def set_y_offset(self, y_offset):
-        self.y_offset = min(
-            max(y_offset, self.min_y_offset), self.max_y_offset
-        )
+    def set_y_offset(self, y_offset: int) -> None:
+        self.y_offset = min(max(y_offset, self.min_y_offset), self.max_y_offset)
 
-    def snap_to_time(self, time=None, center=True):
+    def snap_to_time(
+        self, time: Optional[int] = None, center: bool = True
+    ) -> None:
         if time is None:
             time = self.time
-        cols_per_measure = (
-            self.song.cols_per_beat * self.song.beats_per_measure
-        )
+        cols_per_measure = self.song.cols_per_beat * self.song.beats_per_measure
         time_cols = self.song.ticks_to_cols(time)
-        if (
-            time_cols < self.x_offset
-            or time_cols >= self.x_offset + self.width
-        ):
+        if time_cols < self.x_offset or time_cols >= self.x_offset + self.width:
             new_offset = time_cols
             if center:
                 new_offset -= self.width // 2
@@ -751,7 +796,7 @@ class Interface:
                 + self.x_sidebar_offset
             )
 
-    def insert_note(self, number, chord=False):
+    def insert_note(self, number: int, chord: bool = False):
         if not PLAY_EVENT.is_set():
             self.stop_notes()
 
@@ -784,12 +829,13 @@ class Interface:
         if not PLAY_EVENT.is_set():
             self.play_notes()
 
-    def move_cursor(self, left):
+    def move_cursor(self, left: bool) -> None:
+        nearest_time: Union[int, float]
         if left:
             nearest_chord = self.song.get_previous_chord(self.time, self.track)
             if len(nearest_chord) > 0:
                 nearest_time = nearest_chord[0].start
-                end_time = max([note.end for note in nearest_chord])
+                end_time = max(note.end for note in nearest_chord)
             else:
                 nearest_time = 0
                 end_time = 0
@@ -812,9 +858,14 @@ class Interface:
                 self.last_note is not None
                 and nearest_time <= self.last_note.end
             ):
+                # Should not be inf
+                assert isinstance(nearest_time, int)
                 self.time = nearest_time
             else:
-                self.time = min(self.time + self.duration, nearest_time)
+                # Should not be inf
+                new_time = min(self.time + self.duration, nearest_time)
+                assert isinstance(new_time, int)
+                self.time = new_time
 
         if len(nearest_chord) > 0 and self.time == nearest_time:
             self.last_chord = nearest_chord
@@ -823,7 +874,7 @@ class Interface:
 
         self.snap_to_time()
 
-    def set_octave(self, increase):
+    def set_octave(self, increase: bool) -> None:
         if increase:
             self.octave = min(
                 self.octave + 1, TOTAL_NOTES // NOTES_PER_OCTAVE - 1
@@ -834,7 +885,7 @@ class Interface:
             (self.octave + 1) * NOTES_PER_OCTAVE - self.height // 2
         )
 
-    def set_time(self, increase, chord):
+    def set_time(self, increase: bool, chord: bool) -> None:
         if self.last_note is None:
             return
 
@@ -861,7 +912,7 @@ class Interface:
 
         self.snap_to_time()
 
-    def set_duration(self, increase, chord):
+    def set_duration(self, increase: bool, chord: bool) -> None:
         if self.last_note is not None:
             if not chord:
                 if increase:
@@ -905,7 +956,7 @@ class Interface:
                     self.song.cols_to_ticks(1),
                 )
 
-    def set_velocity(self, increase, chord):
+    def set_velocity(self, increase: bool, chord: bool) -> None:
         if increase:
             self.velocity = min(self.velocity + 1, MAX_VELOCITY - 1)
         else:
@@ -920,7 +971,7 @@ class Interface:
             for note in self.last_chord:
                 note.set_velocity(self.velocity)
 
-    def set_track(self, increase):
+    def set_track(self, increase: bool) -> None:
         old_x_sidebar_offset = self.x_sidebar_offset
         if increase:
             self.track_index += 1
@@ -932,7 +983,7 @@ class Interface:
 
         self.message = format_track(self.track_index, self.track)
 
-    def set_instrument(self, increase):
+    def set_instrument(self, increase: bool) -> None:
         self.stop_notes()
 
         instrument = self.song.tracks[self.track_index].instrument
@@ -948,7 +999,7 @@ class Interface:
 
         self.play_notes()
 
-    def toggle_drum(self):
+    def toggle_drum(self) -> None:
         self.stop_notes()
 
         old_x_sidebar_offset = self.x_sidebar_offset
@@ -964,7 +1015,7 @@ class Interface:
 
         self.message = format_track(self.track_index, self.track)
 
-    def delete(self, back, chord):
+    def delete(self, back: bool, chord: bool) -> None:
         if self.last_note is not None:
             if chord:
                 self.stop_notes()
@@ -988,14 +1039,14 @@ class Interface:
             self.last_chord = []
             self.move_cursor(left=True)
 
-    def create_track(self):
+    def create_track(self) -> None:
         track = self.song.create_track(
             instrument=self.instrument, player=self.player
         )
         self.track_index = self.song.tracks.index(track)
         self.message = format_track(self.track_index, self.track)
 
-    def delete_track(self):
+    def delete_track(self) -> None:
         self.deselect()
         instrument = self.instrument
         self.song.delete_track(self.track)
@@ -1008,7 +1059,7 @@ class Interface:
             self.message = format_track(self.track_index, self.track)
             self.highlight_track = True
 
-    def toggle_playback(self):
+    def toggle_playback(self) -> None:
         if self.player is None:
             self.message = ERROR_FLUIDSYNTH
             return
@@ -1021,7 +1072,7 @@ class Interface:
             PLAY_EVENT.set()
             curses.halfdelay(1)
 
-    def restart_playback(self, restart_time=0):
+    def restart_playback(self, restart_time: int = 0) -> None:
         if self.player is None:
             self.message = ERROR_FLUIDSYNTH
             return
@@ -1032,14 +1083,14 @@ class Interface:
         PLAY_EVENT.set()
         curses.halfdelay(1)
 
-    def cursor_to_playhead(self):
+    def cursor_to_playhead(self) -> None:
         if self.player is None:
-            self.message = ()
+            self.message = ERROR_FLUIDSYNTH
             return
         self.time = self.player.playhead
         self.snap_to_time()
 
-    def export_midi(self):
+    def export_midi(self) -> None:
         if self.filename is None:
             self.message = ERROR_MIDO
             return
@@ -1047,8 +1098,8 @@ class Interface:
         self.song.export_midi(self.filename)
         self.message = f"Wrote MIDI to {self.filename}"
 
-    def cycle_notes(self):
-        if len(self.last_chord) >= 2:
+    def cycle_notes(self) -> bool:
+        if self.last_note is not None and len(self.last_chord) >= 2:
             index = self.last_chord.index(self.last_note)
             index += 1
             index %= len(self.last_chord)
@@ -1056,11 +1107,11 @@ class Interface:
             return True
         return False
 
-    def deselect(self):
+    def deselect(self) -> None:
         self.last_note = None
         self.last_chord = []
 
-    def escape(self):
+    def escape(self) -> None:
         if not self.insert:
             if self.last_note is None:
                 self.message = "Press Ctrl+C to exit MusiCLI"
@@ -1070,7 +1121,7 @@ class Interface:
             self.stop_notes()
             self.insert = False
 
-    def handle_action(self, action):
+    def handle_action(self, action: Action) -> None:
         # Pan view
         x_pan = self.song.cols_per_beat * self.song.beats_per_measure
         x_pan_short = self.song.cols_per_beat
@@ -1189,7 +1240,7 @@ class Interface:
         elif action == Action.QUIT_HELP:
             self.message = "Press Ctrl+C to exit MusiCLI"
 
-    def handle_input(self, input_code):
+    def handle_input(self, input_code: int) -> bool:
         if input_code == curses.ERR:
             return False
 
@@ -1240,14 +1291,17 @@ class Interface:
 
         return False
 
-    def main(self, window):
-        self.init_window(window)
-
+    def main(self) -> None:
         # Loop until user the exits
         previous_playhead = 0
         redraw = True
         while True:
-            if not self.insert and PLAY_EVENT.is_set():
+            if (
+                self.player is not None
+                and PLAY_EVENT.is_set()
+                and not self.insert
+            ):
+                assert self.player is not None
                 self.snap_to_time(self.player.playhead, center=False)
 
             if redraw:
@@ -1260,11 +1314,12 @@ class Interface:
                 sys.exit(1)
 
             redraw = input_code != curses.ERR or (
-                PLAY_EVENT.is_set()
+                self.player is not None
+                and PLAY_EVENT.is_set()
                 and self.player.playhead != previous_playhead
             )
 
-            if PLAY_EVENT.is_set():
+            if self.player is not None and PLAY_EVENT.is_set():
                 previous_playhead = self.player.playhead
 
             if redraw:
