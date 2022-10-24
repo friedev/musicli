@@ -490,19 +490,19 @@ class Note(BaseNote):
 
         self.pair = None
         if duration is not None:
-            if duration <= 0:
-                raise ValueError(f"Duration must be positive; was {duration}")
+            if duration < 0:
+                raise ValueError(
+                    f"Duration must be non-negative; was {duration}"
+                )
             self.make_pair(time + duration if on else time - duration)
 
     def make_pair(self, time: int) -> None:
         if time < 0:
             raise ValueError(f"Time must be non-negative; was {time}")
 
-        if (self.on and time <= self.time) or (
-            not self.on and time >= self.time
-        ):
+        if (self.on and time < self.time) or (not self.on and time > self.time):
             raise ValueError(
-                "Note must end strictly after it starts; "
+                "Note must not end before it starts; "
                 f"times were {self.time} and {time}"
             )
 
@@ -593,13 +593,13 @@ class Note(BaseNote):
                 self.pair.time = time - self.duration
                 if self.pair.time < 0:
                     raise ValueError(
-                        "New start time must be non-negative; " f"was {time}"
+                        f"New start time must be non-negative; was {time}"
                     )
         self.time = time
 
     def set_duration(self, duration: int) -> None:
-        if duration <= 0:
-            raise ValueError(f"Duration must be positive; was {duration}")
+        if duration < 0:
+            raise ValueError(f"Duration must be non-negative; was {duration}")
 
         if self.pair is None:
             self.make_pair(
@@ -1069,15 +1069,12 @@ class Song:
                     for note in active_notes.copy():
                         if note.number == message.note:
                             duration = time - note.time
-                            if duration == 0:
-                                active_notes.remove(note)
-                            else:
-                                note.set_duration(duration)
-                                events.append(note)
-                                assert note.pair is not None
-                                events.append(note.pair)
-                                active_notes.remove(note)
-                                break
+                            note.set_duration(duration)
+                            events.append(note)
+                            assert note.pair is not None
+                            events.append(note.pair)
+                            active_notes.remove(note)
+                            break
                 elif message.type == "program_change":
                     track = self.get_track(
                         message.channel, create=True, player=player
