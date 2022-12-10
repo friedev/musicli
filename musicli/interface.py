@@ -1269,7 +1269,9 @@ class Interface:
                 self.message = f'Key "{input_char}" does not map to a note'
                 return False
 
-        if input_char.isdigit():
+        if input_char.isdigit() and (
+            int(input_char) != 0 or self.repeat_count > 0
+        ):
             self.repeat_count *= 10
             self.repeat_count += int(input_char)
             return True
