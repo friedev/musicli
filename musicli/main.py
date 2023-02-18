@@ -1,5 +1,10 @@
 import argparse
-from argparse import ArgumentParser, ArgumentTypeError, FileType
+from argparse import (
+    ArgumentParser,
+    ArgumentTypeError,
+    BooleanOptionalAction,
+    FileType,
+)
 import curses
 import curses.ascii
 import os
@@ -199,18 +204,13 @@ def main() -> None:
         help="the scale of the song to display in MusiCLI",
     )
     parser.add_argument(
-        "-u",
         "--unicode",
         dest="unicode",
-        action="store_true",
-        help="enable unicode characters (default)",
-    )
-    parser.add_argument(
-        "-U",
-        "--no-unicode",
-        dest="unicode",
-        action="store_false",
-        help="disable unicode characters",
+        action=BooleanOptionalAction,
+        help=(
+            "enable/disable drawing with unicode characters (default: "
+            "enabled)"
+        ),
     )
     parser.add_argument(
         "--crash-file",
