@@ -2,15 +2,17 @@
 
 MusiCLI (pronounced "musically") is a MIDI sequencer that runs entirely in the terminal.
 
-MusiCLI 1.0 was developed in C++ by Aaron Friesen and David Ryan for [CornHacks 2021](https://unlcornhacks.com).
+MusiCLI 1 was a C++ application developed by Aaron Friesen and David Ryan for [CornHacks 2021](https://unlcornhacks.com).
 It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
-For those interested in the old version, it can be found at the tag `v1.0.0`.
+The tag `v1.0.0` marks the state of MusiCLI 1 at the end of CornHacks 2021.
 
-MusiCLI 2.0 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall!
-MusiCLI 2.0 presents a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
-The tag `v2.0.0` marks the state of MusiCLI at the end of the hackathon.
+MusiCLI 2 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall.
+MusiCLI 2 provides a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
+The tag `v2.0.0` marks the state of MusiCLI 2 at the end of CornHacks 2022.
 
 ## Setup
+
+Dependencies:
 
 - Python 3
 - curses
@@ -18,7 +20,7 @@ The tag `v2.0.0` marks the state of MusiCLI at the end of the hackathon.
 - [FluidSynth](https://fluidsynth.org) (optional; required for playback)
 - [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth) (optional; required for playback)
 
-For directions on installing FluidSynth for your platform, refer to [Getting FluidSynth](https://www.fluidsynth.org/download/).
+To install FluidSynth on your device, see [Getting FluidSynth](https://www.fluidsynth.org/download/).
 
 Then, clone the repository and run:
 
@@ -55,16 +57,18 @@ Much more song-specific information can be customized via other command line arg
 ```sh
 musicli --help
 ```
+
 ### Keybindings
 
 **For a full list of editor keybindings, run:**
+
 ```sh
 musicli --keymap
 ```
 
 ### Interface
 
-Unlike the original tracker interface of MusiCLI 1.0, MusiCLI 2.0 provides a piano roll editor that should be familiar to users of modern DAWs.
+Unlike the tracker interface of MusiCLI 1, MusiCLI 2 provides a piano roll interface that should be familiar to users of modern DAWs.
 
 Each line represents a different pitch, labeled with its note name on the left of the UI.
 Further left is the key you can type to enter that note while in insert mode (more on that later).
@@ -90,11 +94,11 @@ The editor scrolls infinitely horizontally, and a limited amount vertically, enc
 
 ### Editing
 
-MusiCLI is a modal editor, like vim, which means that there are different states in which keys do different actions.
+MusiCLI is a modal editor, like vi, which means that the editor has different modes in which keys do different actions.
 
-The default mode is Normal mode, which allows you to navigate freely and use more special commands.
+The default mode is normal mode, which allows you to navigate freely and use more special commands.
 
-You can enter Insert mode by pressing `i`.
+You can enter insert mode by pressing `i`.
 Insert mode allows you to insert notes into your song directly by typing them on the keyboard.
 You may always return to normal mode by pressing Escape.
 
@@ -104,7 +108,7 @@ For quick reference, the keys that correspond to each note are listed to the lef
 
 To change where you are editing, use the arrow keys.
 Left and right will change the beat you are entering, and up and down will change the octave range.
-In Normal mode, you can pan around without changing where you're editing by using the vi keys `hjkl`.
+In normal mode, you can pan around without changing where you're editing by using the vi keys `hjkl`.
 Pressing Shift along with the vi keys will cause you to pan a shorter distance.
 
 Many operations will affect the last note or chord you inserted.
@@ -117,7 +121,7 @@ These notes are highlighted in white and gray respectively.
 Your terminal probably does not have gray as color 8.
 You may be able to change this in your terminal's color scheme settings.
 
-Terminals known to support gray include [Alacritty](https://alacritty.org/) and [foot](https://codeberg.org/dnkl/foot).
+Terminals known to support gray include [Alacritty](https://alacritty.org) and [foot](https://codeberg.org/dnkl/foot).
 Terminals known not to support gray include [cool-retro-term](https://github.com/Swordfish90/cool-retro-term).
 [pywal](https://github.com/dylanaraps/pywal) is also compatible.
 
@@ -133,14 +137,10 @@ Currently, getting the error messages out of a failure like this are challenging
 
 ## Contributing
 
-MusiCLI is a small project initially developed during a hackathon, so be warned that it is not fully polished and documented yet.
-Nonetheless, if you are interested in submitting PRs, we will be happy to review them!
-
-If you want to submit a PR, please follow these guidelines:
-
-- Run some Python linters such as Pylint, flake8, and/or mypy to help ensure consistent code style and quality.
-- If you create any new Python source files, copy the license notice from `musicli.py` into them.
+Before submitting a patch, run [Black](https://black.readthedocs.io) to format your code.
+Strongly consider running other linters as well, such as [pylint](https://pylint.org), [flake8](https://flake8.pycqa.org), and [mypy](https://www.mypy-lang.org).
 
 If you want to contribute but aren't sure what to work on, you can find a list of tasks in `TODO.md`.
 
-If anyone is interested in maintaining and extending MusiCLI 1.0, feel free to make a fork of this repo based off of the `v1.0.0` tag, although I do not intend to maintain it any further myself.
+If anyone is interested in maintaining or extending MusiCLI 1, feel free to fork this repo from the `v1.0.0` tag.
+I do not intend to maintain it any further myself.
