@@ -21,6 +21,8 @@ from .song import (
     DEFAULT_BEATS_PER_MEASURE,
     DEFAULT_COLS_PER_BEAT,
     DEFAULT_KEY,
+    DEFAULT_SCALE_NAME,
+    DEFAULT_TICKS_PER_BEAT,
     IMPORT_MIDO,
     NAME_TO_NUMBER,
     SCALES,
@@ -143,8 +145,10 @@ def optional_file(value):
 
 
 def main() -> None:
+    global CRASH_FILE
+
     # Parse arguments
-    parser = ArgumentParser(description="A MIDI sequencer for the terminal")
+    parser = ArgumentParser(description="TUI MIDI sequencer")
     parser.add_argument(
         "-H",
         "--keymap",
@@ -155,7 +159,7 @@ def main() -> None:
         "file",
         type=optional_file,
         nargs="?",
-        help="MIDI file to read input from and write output to",
+        help=f"MIDI file to read from and write to (default: {DEFAULT_FILE})",
     )
     parser.add_argument(
         "-i",
@@ -163,45 +167,63 @@ def main() -> None:
         dest="import_file",
         type=FileType("r"),
         help=(
-            "MIDI file to import from; overrides the file argument for "
-            "importing"
+            "MIDI file to read from, instead of the file specified by the "
+            '"file" argument'
         ),
     )
     parser.add_argument(
         "-f",
         "--soundfont",
         type=FileType("r"),
-        help="SF2 soundfont file to use for playback",
+        help=(
+            "SF2 soundfont file to use for playback (default: "
+            f"{DEFAULT_SOUNDFONT})"
+        ),
     )
     parser.add_argument(
         "--ticks-per-beat",
         type=positive_int,
-        help="MIDI ticks per beat (quarter note)",
+        help=(
+            "MIDI ticks per beat (default: read from file, if any, else "
+            f"{DEFAULT_TICKS_PER_BEAT})"
+        ),
     )
     parser.add_argument(
         "--cols-per-beat",
         type=positive_int,
         default=DEFAULT_COLS_PER_BEAT,
-        help="the number of subdivisions per beat to display in MusiCLI",
+        help=(
+            "the number of terminal columns per beat to display in the editor "
+            f"(default: {DEFAULT_COLS_PER_BEAT})"
+        ),
     )
     parser.add_argument(
         "--beats-per-measure",
         type=positive_int,
         default=DEFAULT_BEATS_PER_MEASURE,
-        help="the number of beats per measure to display in MusiCLI",
+        help=(
+            "the number of beats per measure to display in the editor "
+            f"(default: {DEFAULT_BEATS_PER_MEASURE})"
+        ),
     )
     parser.add_argument(
         "--key",
         type=str,
         choices=NAME_TO_NUMBER.keys(),
         default=COMMON_NAMES[DEFAULT_KEY],
-        help="the key of the song to display in MusiCLI",
+        help=(
+            "the key signature to display in the editor (default: "
+            f"{COMMON_NAMES[DEFAULT_KEY]})"
+        ),
     )
     parser.add_argument(
         "--scale",
         choices=SCALES.keys(),
-        default="major",
-        help="the scale of the song to display in MusiCLI",
+        default=DEFAULT_SCALE_NAME,
+        help=(
+            "the scale to display in the editor (default: "
+            f"{DEFAULT_SCALE_NAME})"
+        ),
     )
     parser.add_argument(
         "--unicode",
@@ -212,15 +234,15 @@ def main() -> None:
             "enabled)"
         ),
     )
+    parser.set_defaults(unicode=True)
     parser.add_argument(
         "--crash-file",
         type=FileType("w"),
         help=(
-            "file to write debugging info to in the event of a crash; "
-            "set to /dev/null to disable the crash file"
+            "file to write debugging info to in the event of a crash; set to "
+            f"/dev/null to disable the crash file (default: {CRASH_FILE})"
         ),
     )
-    parser.set_defaults(unicode=True)
 
     global ARGS
     ARGS = parser.parse_args()
@@ -263,7 +285,6 @@ def main() -> None:
         global PLAYER
         PLAYER = Player(ARGS.soundfont)
 
-    global CRASH_FILE
     if ARGS.crash_file is not None:
         CRASH_FILE = ARGS.crash_file
 
