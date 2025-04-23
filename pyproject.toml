@@ -3,7 +3,7 @@ requires = ["flit_core ~=3.12"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "musicli"
+name = "musicli-sequencer"
 authors = [{name = "Aaron Friesen"}]
 readme = "README.md"
 license = {file = "LICENSE.txt"}
@@ -20,4 +20,4 @@ GitHub = "https://github.com/friedev/musicli"
 Changelog = "https://github.com/friedev/musicli/blob/main/CHANGELOG.md"
 
 [project.scripts]
-musicli = "musicli.main:main"
+musicli = "musicli_sequencer.main:main"

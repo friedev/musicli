@@ -32,10 +32,10 @@ Dependencies:
 
 To install FluidSynth on your device, see [Getting FluidSynth](https://www.fluidsynth.org/download/).
 
-Then, clone the repository and run:
+Then, you can install MusiCLI from PyPI:
 
 ```sh
-pip install .
+pip install musicli-sequencer
 ```
 
 For live playback, you will need a soundfont in SF2 format.
