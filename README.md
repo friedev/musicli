@@ -152,16 +152,3 @@ Currently, getting the error messages out of a failure like this are challenging
 
 Before submitting a patch, run [Black](https://black.readthedocs.io) to format your code.
 Strongly consider running other linters as well, such as [pylint](https://pylint.org), [flake8](https://flake8.pycqa.org), and [mypy](https://www.mypy-lang.org).
-
-## History
-
-MusiCLI 1.x was a C++ application developed by Aaron Friesen and David Ryan for [CornHacks 2021](https://unlcornhacks.com).
-It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
-The tag `v1.0.0` marks the state of MusiCLI 1 at the end of CornHacks 2021.
-
-MusiCLI 2.x is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall.
-MusiCLI 2 provides a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
-The tag `v2.0.0` marks the state of MusiCLI 2 at the end of CornHacks 2022.
-
-If anyone is interested in maintaining or extending MusiCLI 1.x, feel free to fork this repo from the `v1.0.0` tag.
-I do not intend to maintain it any further myself.
