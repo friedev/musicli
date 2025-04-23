@@ -16,6 +16,8 @@ dependencies = [
 
 [project.urls]
 Home = "https://frie.dev/musicli"
+GitHub = "https://github.com/friedev/musicli"
+Changelog = "https://github.com/friedev/musicli/blob/main/CHANGELOG.md"
 
 [project.scripts]
 musicli = "musicli.main:main"
