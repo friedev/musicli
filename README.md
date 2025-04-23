@@ -2,13 +2,23 @@
 
 MusiCLI (pronounced "musically") is a MIDI sequencer that runs entirely in the terminal.
 
-MusiCLI 1 was a C++ application developed by Aaron Friesen and David Ryan for [CornHacks 2021](https://unlcornhacks.com).
-It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
-The tag `v1.0.0` marks the state of MusiCLI 1 at the end of CornHacks 2021.
+## Features
 
-MusiCLI 2 is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall.
-MusiCLI 2 provides a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
-The tag `v2.0.0` marks the state of MusiCLI 2 at the end of CornHacks 2022.
+Implemented:
+
+- Piano roll interface
+- Basic modal editing
+- Importing and exporting MIDI files
+- Live playback via SF2 soundfonts
+- Multiple tracks and instruments
+
+Not yet implemented:
+
+- Support for all MIDI messages (some MIDI files may play back as expected)
+- MIDI input/output ports
+- Mouse support
+- Real-time input recording
+- Detection of non-General MIDI soundfonts
 
 ## Setup
 
@@ -29,6 +39,7 @@ pip install .
 ```
 
 For live playback, you will need a soundfont in SF2 format.
+Only General MIDI soundfonts are explicitly supported, but others may work.
 I recommend the MuseScore General Soundfont, which can be freely downloaded from the [MuseScore handbook](https://musescore.org/en/handbook/3/soundfonts-and-sfz-files) along with other soundfonts.
 
 ## Usage
@@ -52,7 +63,8 @@ musicli file_to_export.mid --import=file_to_import.mid --soundfont=soundfont.sf2
 Providing a soundfont with `--soundfont` or `-f` is also optional, but live playback will be unavailable unless you do.
 If no soundfont is provided, MusiCLI will look for one at `/usr/share/soundfonts/default.sf2`, which is FluidSynth's default location.
 
-Much more song-specific information can be customized via other command line arguments. View a full list by running:
+Much more song-specific information can be customized via other command line arguments.
+View a full list by running:
 
 ```sh
 musicli --help
@@ -68,7 +80,7 @@ musicli --keymap
 
 ### Interface
 
-Unlike the tracker interface of MusiCLI 1, MusiCLI 2 provides a piano roll interface that should be familiar to users of modern DAWs.
+MusiCLI provides a piano roll interface that should be familiar to users of modern DAWs.
 
 Each line represents a different pitch, labeled with its note name on the left of the UI.
 Further left is the key you can type to enter that note while in insert mode (more on that later).
@@ -125,7 +137,8 @@ Terminals known to support gray include [Alacritty](https://alacritty.org) and [
 Terminals known not to support gray include [cool-retro-term](https://github.com/Swordfish90/cool-retro-term).
 [pywal](https://github.com/dylanaraps/pywal) is also compatible.
 
-> MusiCLI just crashed. What do I do?
+> MusiCLI just crashed.
+> What do I do?
 
 A `crash.log` file should have been generated (or a different file if you set the `--crash-file` option).
 If not, there may be some output directly in the terminal.
@@ -140,7 +153,15 @@ Currently, getting the error messages out of a failure like this are challenging
 Before submitting a patch, run [Black](https://black.readthedocs.io) to format your code.
 Strongly consider running other linters as well, such as [pylint](https://pylint.org), [flake8](https://flake8.pycqa.org), and [mypy](https://www.mypy-lang.org).
 
-If you want to contribute but aren't sure what to work on, you can find a list of tasks in `TODO.md`.
+## History
 
-If anyone is interested in maintaining or extending MusiCLI 1, feel free to fork this repo from the `v1.0.0` tag.
+MusiCLI 1.x was a C++ application developed by Aaron Friesen and David Ryan for [CornHacks 2021](https://unlcornhacks.com).
+It provided a tracker-like curses interface, MIDI export via [Midifile](https://midifile.sapp.org), and limited playback via [FluidSynth](https://fluidsynth.org).
+The tag `v1.0.0` marks the state of MusiCLI 1 at the end of CornHacks 2021.
+
+MusiCLI 2.x is a complete rewrite of MusiCLI in Python, developed from scratch by Aaron Friesen for [CornHacks 2022](https://unlcornhacks.com), where it won third place overall.
+MusiCLI 2 provides a piano roll interface, MIDI import and export via [mido](https://github.com/mido/mido), live non-blocking playback with [pyFluidSynth](https://github.com/nwhitehead/pyfluidsynth), and improved modal editing.
+The tag `v2.0.0` marks the state of MusiCLI 2 at the end of CornHacks 2022.
+
+If anyone is interested in maintaining or extending MusiCLI 1.x, feel free to fork this repo from the `v1.0.0` tag.
 I do not intend to maintain it any further myself.
