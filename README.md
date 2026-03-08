@@ -14,7 +14,7 @@ Implemented:
 
 Not yet implemented:
 
-- Support for all MIDI messages (some MIDI files may play back as expected)
+- Support for all MIDI messages (some MIDI files may not play back as expected)
 - MIDI input/output ports
 - Mouse support
 - Real-time input recording
